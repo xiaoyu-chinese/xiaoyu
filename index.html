@@ -60,9 +60,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);b
 
 /* ---- thương hiệu ---- */
 .brand{display:inline-flex;align-items:center;gap:10px}
-.logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#5bc0ea,var(--brand-d));
-  display:grid;place-items:center;color:#fff;font-family:'Baloo 2';font-weight:800;font-size:1.5rem;
-  box-shadow:0 6px 16px rgba(29,135,192,.3)}
+.logo{width:46px;height:46px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 6px 16px rgba(29,135,192,.3);flex:none}
+.logo img{width:100%;height:100%;object-fit:cover;display:block}
 .brand b{font-family:'Baloo 2';font-size:1.15rem}
 .brand small{display:block;color:var(--muted);font-weight:700;font-size:.72rem;letter-spacing:.03em;margin-top:-2px}
 
@@ -70,8 +69,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);b
 .hero{position:relative;overflow:hidden;border-radius:var(--r);color:var(--ink);padding:26px 24px;
   background:linear-gradient(135deg,rgba(255,255,255,.58),rgba(201,234,250,.42));border:1px solid rgba(255,255,255,.7)}
 .hero p{color:var(--muted)}
-.hero .mark{width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#5bc0ea,var(--brand-d));
-  display:grid;place-items:center;color:#fff;font-family:'Baloo 2';font-weight:800;font-size:2rem;box-shadow:0 8px 18px rgba(29,135,192,.32)}
+.hero .mark{width:58px;height:58px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 8px 18px rgba(29,135,192,.32);border:3px solid rgba(255,255,255,.85)}
+.mark img{width:100%;height:100%;object-fit:cover;display:block}
 .hero h1{font-size:1.7rem;margin-top:14px}
 .hero p{opacity:.95;margin:6px 0 0}
 .wave{position:absolute;left:0;right:0;bottom:-1px;height:40px;display:block}
@@ -121,7 +120,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;padding:18px}
 </head>
 <body>
 <div class="wrap" id="app"><div class="card center"><div class="big">🌊</div><p class="muted">Đang tải…</p></div></div>
-<footer>Học tiếng Trung cùng <b>XiaoYu 小玉</b> · tiến bộ mỗi ngày</footer>
+<footer>Học tiếng Trung cùng <b>XiaoYu Class</b> · tiến bộ mỗi ngày</footer>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -151,7 +150,7 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-const BRAND=`<span class="brand"><span class="logo">玉</span><span><b>Học tiếng Trung cùng XiaoYu</b><small>小玉 · 词汇闯关</small></span></span>`;
+const BRAND=`<span class="brand"><span class="logo"><img src="avatar.jpg" alt=""></span><span><b>Học tiếng Trung cùng XiaoYu</b><small>XiaoYu Class · Lớp học cá nhân hóa</small></span></span>`;
 const CONGRATS=["Hôm nay lại chăm nữa rồi! 🔥","Giữ lửa đỉnh thật đó nha 😎","Một ngày không bỏ, một bước tiến bộ 🚀",
  "Não nay thêm vài từ mới 🧠✨","Chuỗi lửa đang cháy ngùn ngụt! 🔥🔥","Đỉnh của chóp, học tiếp thôi 💪",
  "Mai nghỉ là lửa tắt đó nha 👀","Người chăm nhất lớp đây rồi 🏆","Từ vựng sợ bạn luôn á 😏","Tuyệt vời ông mặt trời ☀️"];
@@ -238,7 +237,7 @@ function viewCreateClass(){
 function viewAuth(){
   const tab=STATE.authTab;
   render(`<div class="card">
-    <div class="hero" style="padding-bottom:30px"><div class="mark">玉</div><h1>Lớp ${esc(STATE.code)}</h1><p>Đăng nhập để bắt đầu</p>${waveSVG('#fff')}</div>
+    <div class="hero" style="padding-bottom:30px"><div class="mark"><img src="avatar.jpg" alt=""></div><h1>Lớp ${esc(STATE.code)}</h1><p>Đăng nhập để bắt đầu</p>${waveSVG('#fff')}</div>
     <div class="seg" style="margin-top:18px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
     <div id="form" style="margin-top:16px"></div>
     <p class="center muted" style="margin-top:8px"><button class="linklike" id="back">← đổi mã lớp</button></p></div>`);
@@ -339,7 +338,7 @@ function fmtDur(s){s=s||0;const m=Math.floor(s/60);return m?`${m}p${String(s%60)
 function viewTeacher(tab){
   tab=tab||'dash';
   render(`<div class="card">
-    <div class="hero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px;font-size:1.5rem">玉</span><span style="color:#fff"><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu 小玉</b><small style="display:block;color:rgba(255,255,255,.85);font-weight:700">Bảng điều khiển · ${esc(STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div>${waveSVG('#fff')}</div>
+    <div class="hero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.jpg" alt=""></span><span style="color:#fff"><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:rgba(255,255,255,.85);font-weight:700">Bảng điều khiển · ${esc(STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div>${waveSVG('#fff')}</div>
     <div class="seg" style="margin-top:16px"><button data-t="dash" class="${tab==='dash'?'on':''}">Học viên</button><button data-t="content" class="${tab==='content'?'on':''}">Nội dung bài</button></div>
     <div id="panel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
     <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div>`);
