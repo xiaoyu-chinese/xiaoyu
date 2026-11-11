@@ -42,14 +42,15 @@ img{max-width:100%}
 
 /* ===================== (2) LANDING ===================== */
 .container{width:min(1480px,94%);margin:auto}
-.topbar{display:flex;align-items:center;gap:24px;padding:16px 0;position:relative;z-index:5}
-.brand{display:flex;align-items:center;gap:12px;min-width:270px}
+.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 20px;margin-top:14px;position:relative;z-index:5;background:rgba(255,255,255,.84);border:1px solid rgba(255,255,255,.95);border-radius:32px;box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
 .brand img{width:66px;height:66px;object-fit:cover;border-radius:50%;border:3px solid white;box-shadow:var(--shadow)}
 .brand-name{font:700 25px 'Playfair Display',Georgia,serif;color:#10396d;white-space:nowrap}
 .brand-tag{font-size:12px;color:#496987;margin-top:3px}
-.nav{display:flex;align-items:center;justify-content:center;gap:4px;flex:1;background:rgba(255,255,255,.70);border:1px solid rgba(255,255,255,.9);border-radius:999px;padding:7px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-.nav a{font-size:13px;font-weight:650;padding:11px 12px;border-radius:999px;white-space:nowrap}
+.nav{display:flex;align-items:center;justify-content:center;gap:2px;flex:1 1 300px;background:none;border:0;padding:0;flex-wrap:wrap}
+.nav a{font-size:13px;font-weight:650;padding:9px 11px;border-radius:999px;white-space:nowrap}
 .nav a:hover,.nav a.active{background:#e0efff;color:#145da6}
+.nav-reg{flex:none}
 .top-actions{display:flex;align-items:center;gap:12px;margin-left:auto}
 .search{width:44px;height:44px;border:1px solid var(--line);background:#fff;border-radius:50%;color:var(--blue);font-size:20px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;white-space:nowrap;border:0;border-radius:999px;padding:13px 22px;font-weight:750;background:linear-gradient(135deg,#267ac5,#14549e);color:white;box-shadow:0 7px 16px rgba(25,101,175,.2);transition:.2s}
@@ -85,7 +86,7 @@ h1 .xy{font-style:italic;color:#1767b5}
 .benefit small{color:var(--muted);font-size:12px}
 .feature-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin:0 auto 22px}
 .feature{display:flex;flex-direction:column;min-height:208px;position:relative;overflow:hidden;border-radius:20px;background:rgba(255,255,255,.83);border:1px solid white;box-shadow:var(--shadow);padding:16px}
-.feature img{position:absolute;right:0;bottom:0;width:58%;height:66%;object-fit:cover;opacity:.86;-webkit-mask-image:linear-gradient(90deg,transparent,#000 38%);mask-image:linear-gradient(90deg,transparent,#000 38%)}
+.feature img{position:absolute;right:0;bottom:0;width:60%;height:72%;object-fit:cover;opacity:.9;-webkit-mask-image:linear-gradient(135deg,transparent 12%,rgba(0,0,0,.55) 48%,#000 80%);mask-image:linear-gradient(135deg,transparent 12%,rgba(0,0,0,.55) 48%,#000 80%)}
 .feature h3{font-size:17px;margin:0 0 10px;position:relative;z-index:1}
 .feature p{font-size:13px;line-height:1.5;max-width:72%;margin:0;position:relative;z-index:1}
 .feature .pill-link{margin-top:auto;align-self:flex-start;position:relative;z-index:2}
@@ -96,12 +97,11 @@ h1 .xy{font-style:italic;color:#1767b5}
 .zalo small{background:white;padding:5px 9px;border-radius:99px;color:#1767b5;font-weight:750;box-shadow:var(--shadow)}
 footer{text-align:center;color:#63809c;font-size:12px;padding:0 0 28px}
 
-@media(max-width:1400px){
-  .topbar{flex-wrap:wrap}.brand{min-width:0}
-  .nav{order:3;flex-basis:100%;flex-wrap:wrap;justify-content:center}
+@media(max-width:1120px){
+  .nav{order:3;flex:1 1 100%;justify-content:center}
 }
 @media(max-width:1150px){
-  .nav a{font-size:12px}.course-grid{grid-template-columns:repeat(3,1fr)}.feature-grid{grid-template-columns:repeat(3,1fr)}
+  .course-grid{grid-template-columns:repeat(3,1fr)}.feature-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media(max-width:700px){
   .container{width:min(100% - 22px,560px)}.topbar{gap:10px;padding:10px 0}.brand img{width:50px;height:50px}.brand-name{font-size:20px}.brand-tag{font-size:10px}
@@ -258,12 +258,8 @@ footer{text-align:center;color:#63809c;font-size:12px;padding:0 0 28px}
         <a href="#about">★ Tìm hiểu về khóa học</a>
         <a href="#feedback">☏ Feedback</a>
         <a href="#trial">▶ Xem dạy thử</a>
-        <a href="#faq">? Giải đáp thắc mắc</a>
       </nav>
-      <div class="top-actions">
-        <button class="search" aria-label="Vào khóa học" onclick="document.getElementById('courses').scrollIntoView({behavior:'smooth'})">⌕</button>
-        <a class="btn" href="https://zalo.me/0368280988" target="_blank" rel="noopener">Đăng ký ngay →</a>
-      </div>
+      <a class="btn nav-reg" href="https://zalo.me/0368280988" target="_blank" rel="noopener">Đăng ký ngay →</a>
     </header>
 
     <main class="container" id="home">
