@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Học tiếng Trung cùng XiaoYu</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Serif:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap">
 <style>
 :root{
   --bg:#e9f5fb; --bg2:#d4ecf7; --surface:#ffffff; --ink:#123a4d; --muted:#5f8498;
@@ -191,6 +191,61 @@ th{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.
 .rankrow+.rankrow{margin-top:8px}
 .rankrow.me{border-color:var(--brand);background:#eef8fe}
 .rankno{font-family:'Baloo 2';font-size:1.2rem;width:30px;text-align:center;color:var(--brand-d)}
+
+/* ===================== TRANG CHỦ (LANDING) ===================== */
+.lp-wrap{max-width:1180px;margin:0 auto;padding-inline:max(18px,env(safe-area-inset-left,0px))}
+.lp-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.80);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.7)}
+.lp-nav-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:9px max(18px,env(safe-area-inset-left,0px))}
+.lp-brand{display:flex;align-items:center;gap:10px;flex:none}
+.lp-brand .logo{width:46px;height:46px}
+.lp-brand b{font-family:'Noto Serif',serif;font-size:1.12rem;color:#0f3b63;display:block;line-height:1.05}
+.lp-brand small{color:var(--muted);font-weight:700;font-size:.66rem}
+.lp-links{display:flex;gap:2px;flex:1;justify-content:center;flex-wrap:wrap}
+.lp-links a{font-weight:700;font-size:.85rem;color:#2d5a72;padding:8px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.lp-links a:hover{background:#eaf6fd;color:var(--brand-d)}
+.lp-links a.on{color:var(--brand-d)}
+.lp-reg{flex:none;text-decoration:none;font-weight:800;font-size:.85rem;color:#fff;background:linear-gradient(135deg,#2f6fd6,#1d4f9c);padding:10px 16px;border-radius:999px;box-shadow:0 6px 16px rgba(29,79,156,.3)}
+@media(max-width:1040px){ .lp-links{display:none} }
+.lp-hero{position:relative;overflow:hidden;background:linear-gradient(118deg,rgba(233,245,251,.82),rgba(203,234,250,.3)),url('sky.jpg') center/cover no-repeat}
+.lp-hero-in{max-width:1180px;margin:0 auto;padding:54px max(18px,env(safe-area-inset-left,0px)) 60px;min-height:290px}
+.lp-hero-txt{max-width:620px}
+.lp-hero h1{font-family:'Noto Serif',serif;font-size:3rem;color:#123a5e;line-height:1.08}
+.lp-xy{color:#1d4f9c}
+.lp-tag{font-style:italic;color:#2d6a8c;font-weight:700;font-size:1.08rem;margin:14px 0 20px;display:inline-block;border-bottom:3px solid rgba(47,159,214,.4);padding-bottom:6px}
+@media(max-width:640px){ .lp-hero h1{font-size:2.05rem} }
+.lp-sec{padding:30px 0}
+.lp-sec h2{font-family:'Baloo 2';font-size:1.4rem;color:#123a5e;margin-bottom:16px}
+.lp-courses{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+@media(max-width:980px){ .lp-courses{grid-template-columns:repeat(2,1fr)} }
+@media(max-width:520px){ .lp-courses{grid-template-columns:1fr} }
+.lp-course{position:relative;overflow:hidden;text-align:left;cursor:pointer;border:1px solid rgba(255,255,255,.85);background:linear-gradient(160deg,#ffffff,#eef7fe);border-radius:18px;padding:18px 16px 20px;box-shadow:var(--shadow-sm);transition:transform .25s,opacity .25s,box-shadow .25s;font:inherit}
+.lp-courses:hover .lp-course{opacity:.62;transform:scale(.96)}
+.lp-courses .lp-course:hover{opacity:1;transform:scale(1.07);z-index:3;box-shadow:0 18px 42px rgba(29,135,192,.3)}
+.lp-clv{font-family:'Baloo 2';font-size:1.95rem;font-weight:800;color:var(--cc)}
+.lp-csub{font-weight:700;color:#355d73;margin:4px 0 16px;min-height:40px;font-size:.92rem}
+.lp-clink{font-weight:800;font-size:.82rem;color:var(--cc)}
+.lp-course.soon .lp-clink{color:var(--muted)}
+.lp-cmark{position:absolute;right:10px;bottom:10px;font-size:2.1rem;opacity:.45}
+.lp-course.soon{filter:saturate(.55)}
+.lp-feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:4px 0 2px}
+@media(max-width:820px){ .lp-feat-grid{grid-template-columns:repeat(2,1fr)} }
+.lp-f{display:flex;gap:10px;align-items:flex-start;color:#355d73;font-weight:700;font-size:.9rem}
+.lp-f .fi{font-size:1.5rem;flex:none}
+.lp-info{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+@media(max-width:980px){ .lp-info{grid-template-columns:repeat(2,1fr)} }
+@media(max-width:520px){ .lp-info{grid-template-columns:1fr} }
+.lp-ic{background:rgba(255,255,255,.74);border:1px solid rgba(255,255,255,.85);border-radius:16px;padding:16px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .25s,opacity .25s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.lp-info:hover .lp-ic{opacity:.66;transform:scale(.97)}
+.lp-info .lp-ic:hover{opacity:1;transform:scale(1.05);z-index:3}
+.lp-ic .ii{font-size:1.5rem}
+.lp-ic b{display:block;margin:8px 0 6px;color:#123a5e}
+.lp-ic small{color:var(--muted);font-weight:600;font-size:.82rem;line-height:1.4}
+.lp-ic .more{display:inline-block;margin-top:10px;color:var(--brand-d);font-weight:800;font-size:.8rem}
+.lp-cta{margin:22px 0 12px;padding:22px 0;background:linear-gradient(120deg,rgba(203,234,250,.62),rgba(233,245,251,.42));border-top:1px solid rgba(255,255,255,.7);border-bottom:1px solid rgba(255,255,255,.7)}
+.lp-cta b{font-family:'Baloo 2';font-size:1.3rem;color:#123a5e}
+.lp-cta .btn{text-decoration:none}
+.lp-zalo{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:55;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2aa4ff,#0b74d4);color:#fff;font-weight:800;font-size:.74rem;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(11,116,212,.42);text-decoration:none}
+.coursebadge{display:inline-flex;align-items:center;gap:8px;background:var(--sky);color:var(--brand-d);font-weight:800;padding:6px 14px;border-radius:999px;font-family:'Baloo 2'}
 </style>
 </head>
 <body>
@@ -305,7 +360,7 @@ function shell(inner){
   </div>`);
   root.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
     const r=b.dataset.r;
-    if(r==='_out'){STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewAuth();return;}
+    if(r==='_out'){STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewLanding();return;}
     go(r);
   });
 }
@@ -591,7 +646,7 @@ async function pageRank(){
   rows.sort((a,b)=> b.pts-a.pts || b.mastered-a.mastered || b.streak-a.streak);
   const medal=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
   shell(`<div class="card">
-    <div class="spread"><h2>🏆 Bảng xếp hạng lớp ${esc(STATE.code)}</h2><span class="pill">${rows.length} bạn</span></div>
+    <div class="spread"><h2>🏆 Bảng xếp hạng lớp ${esc(STATE.codeShort||STATE.code)}</h2><span class="pill">${rows.length} bạn</span></div>
     <p class="muted" style="margin-top:4px">Điểm = tổng mức thành thạo của tất cả các từ. Chăm ôn là leo hạng! 🚀</p>
     <div style="margin-top:14px">${rows.map((r,i)=>`<div class="rankrow ${r.id===STATE.sid?'me':''}">
       <div class="rankno">${medal(i)}</div>
@@ -605,93 +660,173 @@ async function pageRank(){
 function weekOf(d){const o=new Date(d);const day=(o.getDay()+6)%7;o.setDate(o.getDate()-day);return o.toISOString().slice(0,10);}
 function fmtDur(s){s=s||0;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);if(h)return `${h}h${String(m).padStart(2,'0')}`;return m?`${m}p${String(s%60).padStart(2,'0')}`:`${s}s`;}
 
-/* ================= ĐĂNG NHẬP / LANDING ================= */
+/* ================= TRANG CHỦ / ĐĂNG NHẬP ================= */
+const COURSES=[
+  {id:'HSK1',sub:'Bắt đầu từ con số 0',       icon:'🏮',color:'#e8573f',ready:false},
+  {id:'HSK2',sub:'Giao tiếp cơ bản',          icon:'🧧',color:'#2f7fd6',ready:false},
+  {id:'HSK3',sub:'Tự tin nói – Hiểu sâu hơn', icon:'🏯',color:'#17936b',ready:true },
+  {id:'HSK4',sub:'Nâng cao kỹ năng',          icon:'🗼',color:'#8257c4',ready:false},
+  {id:'HSK5',sub:'Thành thạo tiếng Trung',    icon:'🌉',color:'#2f6fd6',ready:false}
+];
+function slug(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/[^a-z0-9]/g,'');}
+const mkCid=(lvl,ts,code)=>lvl+'__'+ts+'__'+code;
+const ZALO='https://zalo.me/0368280988';
+const soon=()=>toast('🚧 Mục này sắp ra mắt nha');
+
 function viewLanding(){
-  if(!FB_OK){ render(`<div class="wrap"><div class="card">
-    <div class="hero"><div class="mark"><img src="avatar.jpg" alt=""></div><h1 style="margin-top:12px">Học tiếng Trung cùng XiaoYu</h1><p>Chưa kết nối Firebase — kiểm tra lại cấu hình.</p></div></div></div>`); return; }
-  render(`<div class="wrap">
-    <div class="pagehead"><h1>Học tiếng Trung cùng XiaoYu</h1></div>
-    <div class="chips">
-      <span class="chip">Ôn thi HSK 1–4</span><span class="chip">Lớp nhóm nhỏ</span><span class="chip">Dạy kỹ · Học kỹ</span>
+  if(!FB_OK){ render(`<div class="wrap"><div class="card center"><div class="big">⚙️</div><p class="muted">Chưa kết nối Firebase — kiểm tra lại cấu hình.</p></div></div>`); return; }
+  const FEAT=[['🏆','Giáo trình chuẩn','theo tiêu chuẩn HSK'],['👥','Giảng viên giàu kinh nghiệm','tận tâm đồng hành'],['📖','Lộ trình học cá nhân hóa','linh hoạt theo sức học'],['🎧','Hỗ trợ nhiệt tình','giải đáp mọi thắc mắc']];
+  const INFO=[['👥','Đội ngũ giáo viên','Giới thiệu đội ngũ giảng viên giàu kinh nghiệm','Tìm hiểu thêm'],
+    ['📖','Tìm hiểu về khóa học','Khám phá phương pháp học hiện đại, lộ trình rõ ràng','Xem chi tiết'],
+    ['💬','Feedback','Cùng lắng nghe những chia sẻ thật từ học viên','Xem feedback'],
+    ['▶️','Xem dạy thử','Trải nghiệm bài học mẫu chất lượng từ XiaoYu','Xem ngay'],
+    ['❓','Giải đáp thắc mắc','Những câu hỏi thường gặp & đặt câu hỏi cho cô','Đặt câu hỏi']];
+  render(`
+  <header class="lp-nav"><div class="lp-nav-in">
+    <div class="lp-brand"><span class="logo"><img src="avatar.jpg" alt=""></span><div><b>XiaoYu Chinese</b><small>Học tiếng Trung – Vững tương lai</small></div></div>
+    <nav class="lp-links">
+      <a class="on">🏠 Trang chủ</a><a data-go="courses">📚 Các khóa học</a><a data-soon>👥 Đội ngũ giáo viên</a>
+      <a data-soon>⭐ Tìm hiểu về khóa học</a><a data-soon>💬 Feedback</a><a data-soon>▶️ Xem dạy thử</a><a data-soon>❓ Giải đáp thắc mắc</a>
+    </nav>
+    <a class="lp-reg" href="${ZALO}" target="_blank" rel="noopener">Đăng ký ngay →</a>
+  </div></header>
+
+  <section class="lp-hero"><div class="lp-hero-in"><div class="lp-hero-txt">
+    <h1>Học tiếng Trung cùng<br><span class="lp-xy">XiaoYu Chinese</span></h1>
+    <div><span class="lp-tag">Học dễ dàng – Tiến bộ vững vàng – Tự tin giao tiếp</span></div>
+    <div class="row"><button class="btn" id="explore">Khám phá khóa học →</button><button class="btn ghost" data-soon>▶ Xem giới thiệu</button></div>
+  </div></div></section>
+
+  <section class="lp-sec" id="courses"><div class="lp-wrap">
+    <div class="spread"><h2>📘 Khóa học tiếng Trung</h2><button class="linklike" data-soon>Xem tất cả khóa học →</button></div>
+    <div class="lp-courses">
+      ${COURSES.map(c=>`<button class="lp-course ${c.ready?'':'soon'}" data-c="${c.id}" style="--cc:${c.color}">
+        <div class="lp-clv">${c.id}</div><div class="lp-csub">${c.sub}</div>
+        <span class="lp-clink">${c.ready?'Tìm hiểu ngay →':'🚧 Sắp ra mắt'}</span><span class="lp-cmark">${c.icon}</span>
+      </button>`).join('')}
     </div>
-    <div class="card logincard">
-      <div class="avatar"><img src="avatar.jpg" alt="XiaoYu"></div>
-      <span class="lname">XiaoYu Class</span>
-      <small class="muted" style="font-weight:700">LỚP HỌC TIẾNG TRUNG CÁ NHÂN HÓA</small>
-      <p class="motto">Học chắc – Hiểu sâu – Nhớ lâu</p>
-      <div class="field ico" style="text-align:left"><label>Mã lớp</label><span class="ic">🎫</span><input id="code" placeholder="VD: HSK3A" autocapitalize="characters" value="${esc(lsGet('lastCode',''))}"></div>
-      <button class="btn block" id="go">Vào lớp →</button>
-      <p class="muted" style="margin-top:14px">Bạn là giáo viên? <button class="linklike" id="mk">Tạo lớp mới</button></p>
-    </div></div>`);
-  $('#go').onclick=async()=>{
-    const c=$('#code').value.trim().toUpperCase(); if(!c) return toast('Nhập mã lớp đã nha');
-    try{ const snap=await clsRef(c).get(); if(!snap.exists) return toast('Chưa có lớp này. Giáo viên tạo lớp mới nhé.');
-      STATE.code=c; STATE.cls=snap.data(); lsSet('lastCode',c); viewAuth(); }
-    catch(e){ toast('Lỗi kết nối, thử lại'); console.error(e); }
-  };
-  $('#mk').onclick=viewCreateClass;
+    <div class="lp-feat-grid" style="margin-top:20px">
+      ${FEAT.map(f=>`<div class="lp-f"><span class="fi">${f[0]}</span><span>${f[1]}<br><span class="muted" style="font-weight:600">${f[2]}</span></span></div>`).join('')}
+    </div>
+  </div></section>
+
+  <section class="lp-sec" style="padding-top:6px"><div class="lp-wrap"><div class="lp-info">
+    ${INFO.map(c=>`<div class="lp-ic" data-soon><div class="ii">${c[0]}</div><b>${c[1]}</b><small>${c[2]}</small><span class="more">${c[3]} →</span></div>`).join('')}
+  </div></div></section>
+
+  <section class="lp-cta"><div class="lp-wrap spread">
+    <b>Bắt đầu hành trình chinh phục tiếng Trung ngay hôm nay! ❤️</b>
+    <a class="btn" href="${ZALO}" target="_blank" rel="noopener">Đăng ký ngay →</a>
+  </div></section>
+  <footer>XiaoYu Chinese · Học tiếng Trung – Vững tương lai · Zalo 0368 280 988</footer>
+  <a class="lp-zalo" href="${ZALO}" target="_blank" rel="noopener">Zalo</a>`);
+
+  root.querySelectorAll('[data-soon]').forEach(b=>b.onclick=soon);
+  root.querySelectorAll('[data-go="courses"]').forEach(b=>b.onclick=()=>{const el=document.getElementById('courses');if(el)el.scrollIntoView({behavior:'smooth'});});
+  const ex=$('#explore'); if(ex)ex.onclick=()=>{const el=document.getElementById('courses');if(el)el.scrollIntoView({behavior:'smooth'});};
+  root.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>pickCourse(b.dataset.c));
 }
-function viewCreateClass(){
-  render(`<div class="wrap"><div class="card"><h2>Tạo lớp mới</h2><p class="muted">Dành cho giáo viên.</p>
+function pickCourse(id){ const c=COURSES.find(x=>x.id===id); if(!c)return; if(!c.ready) return toast('🚧 '+id+' sắp ra mắt nha'); viewLogin(id); }
+
+function viewLogin(courseId){
+  STATE.courseId=courseId; STATE.authTab=STATE.authTab||'student';
+  const tab=STATE.authTab;
+  render(`<div class="wrap"><div class="card">
+    <p><button class="linklike" id="back">← Về trang chủ</button></p>
+    <div class="center" style="margin:6px 0"><div class="avatar" style="width:66px;height:66px"><img src="avatar.jpg" alt=""></div><div style="margin-top:8px"><span class="coursebadge">📘 ${esc(courseId)}</span></div></div>
+    <h2 class="center" style="margin-top:8px">Vào lớp ${esc(courseId)}</h2>
+    <div class="seg" style="margin-top:16px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
+    <div id="form" style="margin-top:16px"></div>
+  </div></div>`);
+  $('#back').onclick=viewLanding;
+  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{STATE.authTab=b.dataset.tab;viewLogin(courseId);});
+  const f=$('#form');
+  if(tab==='student'){
+    f.innerHTML=`
+      <div class="field ico"><label>Mã lớp</label><span class="ic">🎫</span><input id="code" placeholder="VD: A1" autocapitalize="characters" value="${esc(lsGet('lastCode',''))}"></div>
+      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
+      <div class="field ico"><label>Tên của bạn</label><span class="ic">🙂</span><input id="name" placeholder="VD: Minh Anh"></div>
+      <div class="field ico"><label>Mã PIN (4 số, tự đặt)</label><span class="ic">🔒</span><input id="pin" inputmode="numeric" placeholder="VD: 1234"></div>
+      <button class="btn block" id="go">Vào học 🚀</button>
+      <p class="muted" style="margin-top:10px;font-size:.84rem">Nhập đúng mã lớp + tên cô của lớp bạn. Lần đầu nhập tên + PIN để tạo tài khoản; lần sau dùng lại đúng tên + PIN.</p>`;
+    $('#go').onclick=async()=>{
+      const code=$('#code').value.trim().toUpperCase(), tn=$('#tname').value.trim(), name=$('#name').value.trim(), pin=$('#pin').value.trim();
+      if(!code||!tn||!name||!pin) return toast('Điền đủ thông tin nha');
+      const cid=mkCid(courseId,slug(tn),code);
+      try{
+        const snap=await clsRef(cid).get();
+        if(!snap.exists) return toast('Chưa có lớp này — kiểm tra lại mã lớp & tên cô');
+        STATE.code=cid; STATE.codeShort=code; STATE.cls=snap.data(); STATE.teacher=snap.data().teacher||tn;
+        lsSet('lastCode',code); lsSet('lastTeacher',tn);
+        const sid=slug(name)+'_'+pin; const ref=stuRef(cid,sid); const ss=await ref.get();
+        if(!ss.exists) await ref.set({name,pin,createdAt:now(),streak:0,lastDay:'',days:[]});
+        else if(ss.data().pin!==pin) return toast('Sai PIN rồi nha');
+        STATE.sid=sid; STATE.role='student';
+        await loadMe(); await loadCards(); ROUTE='home'; pageHome();
+      }catch(e){ console.error(e); toast('Lỗi kết nối, thử lại'); }
+    };
+  }else{
+    f.innerHTML=`
+      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
+      <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="pw" placeholder="mật khẩu"></div>
+      <button class="btn block" id="go">Vào bảng điều khiển</button>
+      <p class="muted" style="margin-top:10px">Chưa có lớp? <button class="linklike" id="mk">Tạo lớp mới</button></p>`;
+    $('#mk').onclick=()=>viewCreateClass(courseId);
+    $('#go').onclick=async()=>{
+      const tn=$('#tname').value.trim(), pw=$('#pw').value.trim(); if(!tn||!pw) return toast('Điền tên + mật khẩu');
+      try{
+        const q=await db.collection('classes').where('level','==',courseId).where('teacherSlug','==',slug(tn)).where('pin','==',pw).get();
+        if(q.empty) return toast('Sai tên giáo viên hoặc mật khẩu');
+        lsSet('lastTeacher',tn);
+        if(q.docs.length===1){ enterTeacher(q.docs[0]); }
+        else{
+          render(`<div class="wrap"><div class="card"><h2>Chọn lớp để quản lý</h2><div class="grid" style="margin-top:12px" id="pick"></div>
+            <p class="center" style="margin-top:12px"><button class="linklike" id="b">← Quay lại</button></p></div></div>`);
+          $('#b').onclick=()=>viewLogin(courseId);
+          const pk=$('#pick'); q.docs.forEach(d=>{const b=document.createElement('button');b.className='listbtn';b.innerHTML=`<div class="spread"><b>Lớp ${esc(d.data().code)}</b><span class="pill">${esc(d.data().level)}</span></div>`;b.onclick=()=>enterTeacher(d);pk.appendChild(b);});
+        }
+      }catch(e){ console.error(e); toast('Lỗi kết nối'); }
+    };
+  }
+}
+function enterTeacher(doc){ const d=doc.data(); STATE.code=doc.id; STATE.codeShort=d.code; STATE.courseId=d.level; STATE.cls=d; STATE.teacher=d.teacher; STATE.role='teacher'; viewTeacher(); }
+
+function viewCreateClass(courseId){
+  courseId=courseId||STATE.courseId||'HSK3';
+  render(`<div class="wrap"><div class="card"><h2>Tạo lớp mới · ${esc(courseId)}</h2><p class="muted">Dành cho giáo viên.</p>
     <div style="margin-top:14px">
-    <div class="field ico"><label>Mã lớp (học viên sẽ nhập)</label><span class="ic">🎫</span><input id="c" placeholder="VD: HSK3A" autocapitalize="characters"></div>
+    <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tn" placeholder="VD: Cô Ngọ"></div>
+    <div class="field ico"><label>Mã lớp (học viên sẽ nhập)</label><span class="ic">🎫</span><input id="c" placeholder="VD: A1" autocapitalize="characters"></div>
     <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="p" placeholder="VD: 2468"></div>
     <button class="btn block" id="save">Tạo lớp</button>
     <p class="center" style="margin-top:12px"><button class="linklike" id="back">← Quay lại</button></p></div></div></div>`);
-  $('#back').onclick=viewLanding;
+  $('#back').onclick=()=>viewLogin(courseId);
   $('#save').onclick=async()=>{
-    const c=$('#c').value.trim().toUpperCase(), p=$('#p').value.trim();
-    if(!c||!p) return toast('Điền đủ mã lớp + mật khẩu');
-    const ex=await clsRef(c).get(); if(ex.exists) return toast('Mã lớp đã tồn tại, chọn mã khác');
-    await clsRef(c).set({teacherPin:p,createdAt:now()});
-    toast('Đã tạo lớp 🎉'); STATE.code=c; STATE.cls={teacherPin:p}; STATE.role='teacher'; viewTeacher();
+    const tn=$('#tn').value.trim(), c=$('#c').value.trim().toUpperCase(), p=$('#p').value.trim();
+    if(!tn||!c||!p) return toast('Điền đủ tên cô + mã lớp + mật khẩu');
+    const cid=mkCid(courseId,slug(tn),c);
+    const ex=await clsRef(cid).get(); if(ex.exists) return toast('Lớp này (cô + mã) đã tồn tại');
+    const data={level:courseId,teacher:tn,teacherSlug:slug(tn),code:c,pin:p,createdAt:now()};
+    await clsRef(cid).set(data);
+    toast('Đã tạo lớp 🎉'); STATE.code=cid; STATE.codeShort=c; STATE.courseId=courseId; STATE.cls=data; STATE.teacher=tn; STATE.role='teacher'; viewTeacher();
   };
-}
-function viewAuth(){
-  const tab=STATE.authTab;
-  render(`<div class="wrap"><div class="card">
-    <div class="hero" style="padding-bottom:22px"><div class="mark"><img src="avatar.jpg" alt=""></div><h1 style="margin-top:12px">Lớp ${esc(STATE.code)}</h1><p>Đăng nhập để bắt đầu</p></div>
-    <div class="seg" style="margin-top:18px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
-    <div id="form" style="margin-top:16px"></div>
-    <p class="center muted" style="margin-top:8px"><button class="linklike" id="back">← đổi mã lớp</button></p></div></div>`);
-  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{STATE.authTab=b.dataset.tab;viewAuth();});
-  $('#back').onclick=viewLanding;
-  const f=$('#form');
-  if(tab==='student'){
-    f.innerHTML=`<div class="field ico"><label>Tên của bạn</label><span class="ic">🙂</span><input id="name" placeholder="VD: Minh Anh"></div>
-      <div class="field ico"><label>Mã PIN (4 số, tự đặt)</label><span class="ic">🔒</span><input id="pin" inputmode="numeric" placeholder="VD: 1234"></div>
-      <button class="btn block" id="go">Vào học 🚀</button>
-      <p class="muted" style="margin-top:10px;font-size:.85rem">Lần đầu: nhập tên + PIN để tạo tài khoản. Lần sau dùng lại đúng tên + PIN.</p>`;
-    $('#go').onclick=async()=>{
-      const name=$('#name').value.trim(), pin=$('#pin').value.trim(); if(!name||!pin) return toast('Điền tên + PIN');
-      const sid=name.toLowerCase().replace(/\s+/g,'_')+'_'+pin; const ref=stuRef(STATE.code,sid); const snap=await ref.get();
-      if(!snap.exists) await ref.set({name,pin,createdAt:now(),streak:0,lastDay:'',days:[]});
-      else if(snap.data().pin!==pin) return toast('Sai PIN rồi nha');
-      STATE.sid=sid; STATE.role='student';
-      await loadMe(); await loadCards(); ROUTE='home'; pageHome();
-    };
-  }else{
-    f.innerHTML=`<div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="p" placeholder="mật khẩu"></div>
-      <button class="btn block" id="go">Vào bảng điều khiển</button>`;
-    $('#go').onclick=()=>{ if($('#p').value.trim()===STATE.cls.teacherPin){STATE.role='teacher';viewTeacher();} else toast('Sai mật khẩu'); };
-  }
 }
 
 /* ================= GIÁO VIÊN ================= */
 function viewTeacher(tab){
   tab=tab||'dash';
   render(`<div class="wrap"><div class="card">
-    <div class="hero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.jpg" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Bảng điều khiển · ${esc(STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div></div>
+    <div class="hero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.jpg" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Bảng điều khiển · ${esc(STATE.courseId||'')} · Lớp ${esc(STATE.codeShort||STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div></div>
     <div class="seg" style="margin-top:16px"><button data-t="dash" class="${tab==='dash'?'on':''}">Học viên</button><button data-t="content" class="${tab==='content'?'on':''}">Nội dung bài</button></div>
     <div id="panel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
     <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
   root.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>viewTeacher(b.dataset.t));
-  $('#out').onclick=()=>{STATE.role=null;viewAuth();};
+  $('#out').onclick=()=>{STATE.role=null;viewLanding();};
   tab==='dash'?teacherDash():teacherContent();
 }
 async function teacherDash(){
   const panel=$('#panel'); const stus=await stuCol(STATE.code).get();
-  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào đăng nhập.<br>Chia sẻ mã lớp <b>${esc(STATE.code)}</b> cho các em nhé.</div>`; return; }
+  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào đăng nhập.<br>Chia sẻ mã lớp <b>${esc(STATE.codeShort||STATE.code)}</b> + tên cô cho các em nhé.</div>`; return; }
   const rows=[];
   for(const s of stus.docs){ const d=s.data();
     const cards=(await cardsCol(STATE.code,s.id).get()).docs.map(x=>x.data());
@@ -714,7 +849,7 @@ function exportCSV(rows){
   lines.push(''); lines.push(['Tên','Tuần','Ngày','Kiểu','Số từ','Đúng','Sai','Giây'].join(','));
   rows.forEach(r=>r._sess.forEach(s=>lines.push([r.name,s.week||'',new Date(s.startedAt).toISOString().slice(0,10),s.game||'',s.reviewed||0,s.correct||0,s.wrong||0,s.dur||0].join(','))));
   const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='xiaoyu_'+STATE.code+'_'+todayKey()+'.csv'; a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='xiaoyu_'+(STATE.codeShort||'lop')+'_'+todayKey()+'.csv'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 function teacherContent(){
