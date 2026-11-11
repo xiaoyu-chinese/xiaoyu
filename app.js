@@ -1,0 +1,561 @@
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAeeTVhAnTds9pPxCPcgNWAbc4zAiVsP3I",
+  authDomain: "xiaoyu-chinese.firebaseapp.com",
+  projectId: "xiaoyu-chinese",
+  storageBucket: "xiaoyu-chinese.firebasestorage.app",
+  messagingSenderId: "333044970276",
+  appId: "1:333044970276:web:356bb1af3eda4649eb79b1"
+};
+let db=null, FB_OK=false;
+try{ if(firebaseConfig.apiKey && firebaseConfig.apiKey!=="DAN_VAO_DAY"){
+  firebase.initializeApp(firebaseConfig); db=firebase.firestore(); FB_OK=true; } }catch(e){ console.warn(e); }
+
+/* ---- tiện ích ---- */
+const root=document.getElementById('app');
+const landing=document.getElementById('landing');
+const $=s=>document.querySelector(s);
+const todayKey=()=> new Date().toISOString().slice(0,10);
+const now=()=>Date.now();
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+const render=h=>{landing.hidden=true;root.hidden=false;root.innerHTML=h;window.scrollTo(0,0);};
+function showLanding(){root.hidden=true;root.innerHTML='';landing.hidden=false;window.scrollTo(0,0);}
+function initLanding(){ document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();pickCourse(b.dataset.course);})); }
+
+/* ---- dữ liệu từ vựng (vocab.js) ---- */
+const LESSONS=(window.VOCAB&&window.VOCAB.lessons)||[];
+const WORDMAP={}; const ALLWORDS=[];
+LESSONS.forEach(l=>(l.words||[]).forEach(w=>{const o={...w,lessonId:l.id,lessonTitle:l.title};WORDMAP[w.id]=o;ALLWORDS.push(o);}));
+const TOTAL_WORDS=ALLWORDS.length;
+
+const CONGRATS=["Hôm nay lại chăm nữa rồi! 🔥","Giữ lửa đỉnh thật đó nha 😎","Một ngày không bỏ, một bước tiến bộ 🚀",
+ "Não nay thêm vài từ mới 🧠✨","Chuỗi lửa đang cháy ngùn ngụt! 🔥","Đỉnh của chóp, học tiếp thôi 💪",
+ "Người chăm nhất lớp đây rồi 🏆","Từ vựng sợ bạn luôn á 😏","Tuyệt vời ông mặt trời ☀️"];
+
+let STATE={code:null,cls:null,sid:null,role:null,authTab:'student'};
+let ME=null;            // dữ liệu học viên
+let CARDS={};           // {wid: card}
+let ROUTE='home';
+
+const clsRef=c=>db.collection('classes').doc(c);
+const stuCol=c=>clsRef(c).collection('students');
+const stuRef=(c,s)=>stuCol(c).doc(s);
+const cardsCol=(c,s)=>stuRef(c,s).collection('cards');
+const sessCol=(c,s)=>stuRef(c,s).collection('sessions');
+
+/* ---- lịch lặp lại ngắt quãng (SM-2 rút gọn) + mức thành thạo chung ---- */
+function schedule(card,grade){
+  card.reps=card.reps||0; card.ease=card.ease||2.3; card.interval=card.interval||0;
+  card.seen=(card.seen||0)+1;
+  if(grade===0){ card.reps=0; card.interval=1; card.ease=Math.max(1.6,card.ease-0.2); card.wrong=(card.wrong||0)+1;
+    card.mastery=Math.max(0,(card.mastery||0)-1); }
+  else{ card.correct=(card.correct||0)+1; card.reps++;
+    if(grade===1){ card.ease=Math.max(1.7,card.ease-0.1); }
+    else { card.mastery=Math.min(5,(card.mastery||0)+1); }
+    if(card.reps===1) card.interval=1; else if(card.reps===2) card.interval=3;
+    else card.interval=Math.round(card.interval*card.ease);
+    if(grade===1) card.interval=Math.max(1,Math.round(card.interval*0.6)); }
+  const d=new Date(); d.setDate(d.getDate()+card.interval); card.due=d.toISOString().slice(0,10);
+  return card;
+}
+const isDue=card=> card && (!card.due || card.due<=todayKey());
+const masteryOf=wid=>{const c=CARDS[wid];return c?(c.mastery||0):0;};
+function mbar(lv){let h='<span class="mbar">';for(let i=1;i<=5;i++)h+=`<i class="${i<=lv?'f'+lv:''}"></i>`;return h+'</span>';}
+
+/* ---- chuẩn hoá để tự chấm ---- */
+function normPinyin(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ü/g,'u').replace(/[^a-z]/g,'');}
+function normHan(s){return (s||'').replace(/\s+/g,'').replace(/[，。！？、,.!?]/g,'');}
+
+/* ================= TẢI / LƯU ================= */
+async function loadMe(){ ME=(await stuRef(STATE.code,STATE.sid).get()).data();
+  const tk=todayKey();
+  if(ME.lastDay!==tk){ const y=new Date(Date.now()-864e5).toISOString().slice(0,10);
+    ME.streak=(ME.lastDay===y)?(ME.streak||0)+1:1; ME.lastDay=tk; ME.days=ME.days||[]; if(!ME.days.includes(tk))ME.days.push(tk);
+    ME._newday=true; await stuRef(STATE.code,STATE.sid).update({streak:ME.streak,lastDay:tk,days:ME.days}); }
+}
+async function loadCards(){ const snap=await cardsCol(STATE.code,STATE.sid).get(); CARDS={}; snap.docs.forEach(d=>CARDS[d.id]=d.data()); }
+async function saveCard(c){ const {_word,...save}=c; await cardsCol(STATE.code,STATE.sid).doc(c.wid).set(save,{merge:true}); CARDS[c.wid]=save; }
+
+/* ================= SHELL (banner + sidebar) ================= */
+const NAV=[
+  {id:'home',  ic:'🏠', t:'Trang chính'},
+  {id:'list',  ic:'📖', t:'List từ vựng'},
+  {id:'review',ic:'🎮', t:'Ôn từ vựng'},
+  {id:'sbt',   ic:'📝', t:'Bài tập SBT'},
+  {id:'stats', ic:'📊', t:'Tổng quan'},
+  {id:'rank',  ic:'🏆', t:'Xếp hạng'}
+];
+function banner(){return `<div class="banner"><div class="banner-in">
+  <div class="b-logo"><img src="assets/avatar.png" alt="XiaoYu"></div>
+  <div class="b-main">
+    <div class="b-title">Học tiếng Trung cùng XiaoYu</div>
+    <div class="b-sub">Ôn thi HSK1–4 · Lớp học tiếng Trung nhóm nhỏ · Dạy kỹ, học kỹ, tiến bộ mỗi ngày</div>
+  </div>
+  <a class="b-zalo" href="https://zalo.me/0368280988" target="_blank" rel="noopener">💬 Zalo 0368 280 988</a>
+</div></div>`;}
+function shell(inner){
+  render(`${banner()}<div class="shell">
+    <nav class="sidebar">
+      ${NAV.map(n=>`<button class="navbtn ${ROUTE===n.id?'on':''}" data-r="${n.id}"><span class="ni">${n.ic}</span><span class="nlabel">${n.t}</span></button>`).join('')}
+      <button class="navbtn out" data-r="_out"><span class="ni">🚪</span><span class="nlabel">Đăng xuất</span></button>
+    </nav>
+    <main class="content">${inner}</main>
+  </div>`);
+  root.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    const r=b.dataset.r;
+    if(r==='_out'){STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewLanding();return;}
+    go(r);
+  });
+}
+function go(r){ ROUTE=r;
+  if(r==='home')return pageHome();
+  if(r==='list')return pageList();
+  if(r==='review')return pageReview();
+  if(r==='sbt')return pageSBT();
+  if(r==='stats')return pageStats();
+  if(r==='rank')return pageRank();
+}
+
+/* ================= TRANG CHÍNH ================= */
+function dueList(){return ALLWORDS.filter(w=>{const c=CARDS[w.id];return c&&isDue(c);});}
+function pageHome(){
+  const learned=Object.keys(CARDS).length;
+  const due=dueList().length;
+  const mastered=ALLWORDS.filter(w=>masteryOf(w.id)>=5).length;
+  shell(`
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="apphero"><div class="spread">
+        <div><p>Chào ${esc(ME.name)} 👋</p><h1 style="font-size:1.7rem;margin-top:4px">Giữ lửa nào!</h1></div>
+        <div class="center"><div style="font-size:2.3rem">🔥</div><div class="big" style="line-height:1">${ME.streak||0}</div><span class="muted" style="font-weight:800">ngày</span></div>
+      </div></div>
+    </div>
+    ${ME._newday?`<div style="margin:12px 0"><span class="pill coral">+1 giữ chuỗi hôm nay! ${CONGRATS[Math.floor(Math.random()*CONGRATS.length)]}</span></div>`:''}
+    <div class="card">
+      <div class="grid cols3">
+        <div class="stat"><b>${due}</b><span>CẦN ÔN</span></div>
+        <div class="stat"><b>${learned}</b><span>ĐÃ HỌC</span></div>
+        <div class="stat"><b>${mastered}/${TOTAL_WORDS}</b><span>ĐÃ THUỘC</span></div>
+      </div>
+      <button class="btn block ${due?'coral':''}" id="rev" style="margin-top:16px;${due?'':'opacity:.6'}">${due?`🔁 Ôn ${due} từ đến hạn`:'✅ Hôm nay không có từ đến hạn'}</button>
+      <button class="btn block ghost" id="learn" style="margin-top:10px">📖 Vào List từ vựng</button>
+    </div>
+    <div class="card">
+      <h3>📚 Học / ôn theo bài</h3>
+      <div class="grid" style="margin-top:10px">
+        ${LESSONS.map(l=>{const tot=l.words.length;const done=l.words.filter(w=>CARDS[w.id]).length;const mas=l.words.filter(w=>masteryOf(w.id)>=5).length;
+          return `<button class="listbtn" data-les="${l.id}"><div class="spread"><span style="font-weight:800">${esc(l.title)}</span><span class="pill ${mas===tot?'jade':''}">${done}/${tot}${mas?` · 💎${mas}`:''}</span></div></button>`;}).join('')}
+      </div>
+    </div>`);
+  $('#rev').onclick=()=> dueList().length?startGame('flash','due',null):toast('Chưa có từ đến hạn — học bài mới nhé!');
+  $('#learn').onclick=()=>go('list');
+  root.querySelectorAll('[data-les]').forEach(b=>b.onclick=()=>{ROUTE='review';reviewPickGame('lesson',b.dataset.les);});
+}
+
+/* ================= LIST TỪ VỰNG ================= */
+let LIST_SORT='lesson', LIST_Q='';
+function pageList(){
+  shell(`
+    <div class="card">
+      <div class="spread"><h2>📖 List từ vựng</h2><span class="pill">${TOTAL_WORDS} từ</span></div>
+      <div class="field ico" style="margin:14px 0 10px"><span class="ic">🔍</span><input id="q" placeholder="Tìm 汉字 / pinyin / nghĩa…" value="${esc(LIST_Q)}" style="padding-left:42px"></div>
+      <div class="seg"><button data-s="lesson" class="${LIST_SORT==='lesson'?'on':''}">Theo bài</button><button data-s="abc" class="${LIST_SORT==='abc'?'on':''}">ABC (pinyin)</button></div>
+    </div>
+    <div id="vlist"></div>`);
+  $('#q').oninput=e=>{LIST_Q=e.target.value;drawList();};
+  root.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{LIST_SORT=b.dataset.s;root.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));drawList();});
+  drawList();
+}
+function drawList(){
+  const box=$('#vlist'); if(!box)return;
+  const q=LIST_Q.trim().toLowerCase(), qn=normPinyin(q);
+  let ws=ALLWORDS.filter(w=> !q || w.hanzi.includes(q) || normPinyin(w.pinyin).includes(qn) || (w.vi||'').toLowerCase().includes(q));
+  if(LIST_SORT==='abc') ws=[...ws].sort((a,b)=>normPinyin(a.pinyin)<normPinyin(b.pinyin)?-1:1);
+  if(!ws.length){box.innerHTML=`<div class="card center muted">Không tìm thấy từ nào 🤔</div>`;return;}
+  let cur=null, html='';
+  ws.forEach(w=>{
+    if(LIST_SORT==='lesson' && w.lessonId!==cur){cur=w.lessonId; html+=`<h3 style="margin:18px 4px 8px;color:var(--ink);text-shadow:0 1px 10px rgba(255,255,255,.7)">${esc(w.lessonTitle)}</h3>`;}
+    const lv=masteryOf(w.id);
+    const exHi=esc(w.ex).replace(esc(w.hanzi),`<b>${esc(w.hanzi)}</b>`);
+    html+=`<div class="vrow">
+      <div class="vtop"><span class="vh">${esc(w.hanzi)}</span><span class="vp">${esc(w.pinyin)}</span><span class="vpos">${esc(w.pos)}</span><span style="margin-left:auto">${mbar(lv)}</span></div>
+      <div class="vvi">${esc(w.vi)}</div>
+      <div class="vex">${exHi}<br><span style="opacity:.85">${esc(w.exVi)}</span></div>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+
+/* ================= ÔN TỪ VỰNG ================= */
+function pageReview(){
+  shell(`
+    <div class="card">
+      <h2>🎮 Ôn từ vựng</h2>
+      <p class="muted" style="margin-top:4px">Chọn phạm vi rồi chọn kiểu chơi. Mọi game cùng tính vào một mức thành thạo cho mỗi từ.</p>
+      <label style="margin-top:14px">Phạm vi ôn</label>
+      <select id="scope">
+        <option value="due">🔁 Từ đến hạn hôm nay (${dueList().length})</option>
+        <option value="all">🌊 Tất cả ${TOTAL_WORDS} từ</option>
+        ${LESSONS.map(l=>`<option value="les:${l.id}">${esc(l.title)} (${l.words.length})</option>`).join('')}
+      </select>
+    </div>
+    <div class="card">
+      <h3>Chọn kiểu chơi</h3>
+      <div class="grid cols2" style="margin-top:12px">
+        <div class="gamecard" data-g="flash"><div class="gi">📇</div><b>Thẻ lật</b><small>Xem Hán → tự nhớ nghĩa</small></div>
+        <div class="gamecard" data-g="pinyin"><div class="gi">🔤</div><b>Gõ pinyin</b><small>Nhìn Hán, gõ pinyin</small></div>
+        <div class="gamecard" data-g="hanzi"><div class="gi">✍️</div><b>Gõ chữ Hán</b><small>Nghe nghĩa, gõ 汉字</small></div>
+        <div class="gamecard" data-g="mean"><div class="gi">🎯</div><b>Chọn nghĩa</b><small>Trắc nghiệm nghĩa tiếng Việt</small></div>
+      </div>
+    </div>`);
+  const scopeSel=$('#scope');
+  root.querySelectorAll('[data-g]').forEach(c=>c.onclick=()=>{
+    const v=scopeSel.value; let scope='all',lid=null;
+    if(v==='due')scope='due'; else if(v==='all')scope='all'; else {scope='lesson';lid=v.slice(4);}
+    startGame(c.dataset.g,scope,lid);
+  });
+}
+function reviewPickGame(scope,lid){ // vào thẳng từ nút bài ở trang chính
+  startGame('flash',scope,lid);
+}
+
+function buildQueue(scope,lid){
+  let words=[];
+  if(scope==='due') words=dueList();
+  else if(scope==='lesson'){ const l=LESSONS.find(x=>x.id===lid); words=l?l.words.map(w=>WORDMAP[w.id]):[]; }
+  else words=ALLWORDS.slice();
+  // xáo trộn
+  for(let i=words.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[words[i],words[j]]=[words[j],words[i]];}
+  return words.map(w=>({w, card: CARDS[w.id]||{wid:w.id,lessonId:w.lessonId,reps:0,ease:2.3,interval:0,due:'',correct:0,wrong:0,seen:0,mastery:0}}));
+}
+const GAME_NAMES={flash:'Thẻ lật',pinyin:'Gõ pinyin',hanzi:'Gõ chữ Hán',mean:'Chọn nghĩa'};
+
+function startGame(game,scope,lid){
+  const queue=buildQueue(scope,lid);
+  if(!queue.length) return toast('Không có từ trong phạm vi này');
+  const session={startedAt:now(),game,reviewed:0,correct:0,wrong:0,scope:(scope==='lesson'?lid:scope)};
+  let i=0, tStart=0;
+  function frame(inner){
+    shell(`<div class="card">
+      <div class="spread"><span class="pill">${GAME_NAMES[game]} · ${i+1}/${queue.length}</span><button class="linklike" id="x">Thoát</button></div>
+      <div class="progressbar" style="margin:12px 0"><i style="width:${Math.round(i/queue.length*100)}%"></i></div>
+      ${inner}</div>`);
+    $('#x').onclick=()=>finish(true);
+  }
+  async function grade(item,g){
+    const ms=Date.now()-tStart; item.card.timeMs=(item.card.timeMs||0)+ms;
+    schedule(item.card,g); session.reviewed++; g===0?session.wrong++:session.correct++;
+    item.card.wid=item.w.id; item.card.lessonId=item.w.lessonId;
+    await saveCard(item.card); i++; step();
+  }
+  function step(){
+    if(i>=queue.length) return finish(false);
+    const item=queue[i], w=item.w; tStart=Date.now();
+    if(game==='flash') return flashCard(item);
+    if(game==='pinyin') return typeCard(item,'pinyin');
+    if(game==='hanzi') return typeCard(item,'hanzi');
+    if(game==='mean') return meanCard(item);
+  }
+  function flashCard(item){const w=item.w;
+    frame(`<div class="flash" id="fc"><div class="hz">${esc(w.hanzi)}</div><p class="muted" id="hint">Chạm để xem đáp án 👆</p></div>
+      <div id="ans" hidden class="center" style="margin-top:14px">
+        <div style="font-size:1.25rem;font-weight:800;color:var(--brand-d)">${esc(w.pinyin)} <span class="vpos">${esc(w.pos)}</span></div>
+        <div style="font-size:1.2rem;margin:4px 0">${esc(w.vi)}</div>
+        <div class="muted" style="margin-top:6px">${esc(w.ex)}<br>${esc(w.exVi)}</div>
+        <div class="row" style="justify-content:center;margin-top:18px">
+          <button class="btn bad" data-g="0">Quên</button><button class="btn warn" data-g="1">Mơ hồ</button><button class="btn good" data-g="2">Nhớ</button></div>
+      </div>`);
+    $('#fc').onclick=()=>{const h=$('#hint');if(h)h.remove();$('#ans').hidden=false;};
+    root.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>grade(item,+b.dataset.g));
+  }
+  function typeCard(item,kind){const w=item.w;
+    const prompt = kind==='pinyin'
+      ? `<div class="hz">${esc(w.hanzi)}</div><p class="muted">Gõ pinyin (có hoặc không dấu đều được)</p>`
+      : `<div style="font-size:1.4rem;font-weight:800">${esc(w.vi)}</div><p class="muted">${esc(w.pinyin)} — gõ chữ Hán 汉字</p>`;
+    frame(`<div class="center" style="padding:10px 0 4px">${prompt}</div>
+      <input id="in" class="ansbox" autocomplete="off" autocapitalize="off" placeholder="${kind==='pinyin'?'vd: fuxi':'gõ 汉字'}" style="margin-top:12px">
+      <button class="btn block" id="ck" style="margin-top:12px">Kiểm tra</button>
+      <div id="fb" style="margin-top:12px"></div>`);
+    const inp=$('#in'); inp.focus();
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
+    $('#ck').onclick=check;
+    function check(){
+      const val=inp.value.trim(); if(!val)return;
+      const ok = kind==='pinyin' ? normPinyin(val)===normPinyin(w.pinyin) : normHan(val)===normHan(w.hanzi);
+      inp.disabled=true;$('#ck').disabled=true;
+      $('#fb').innerHTML=`<div class="${ok?'opt ok':'opt no'}">${ok?'✅ Chính xác!':'❌ Chưa đúng'} &nbsp; <b style="font-family:Baloo 2,sans-serif;font-size:1.15rem">${esc(w.hanzi)}</b> · ${esc(w.pinyin)} · ${esc(w.vi)}</div>
+        <button class="btn block ${ok?'good':'coral'}" id="nx" style="margin-top:10px">Tiếp →</button>`;
+      $('#nx').onclick=()=>grade(item, ok?2:0);
+    }
+  }
+  function meanCard(item){const w=item.w;
+    const others=ALLWORDS.filter(x=>x.id!==w.id).sort(()=>Math.random()-0.5).slice(0,3).map(x=>x.vi);
+    const opts=[w.vi,...others].sort(()=>Math.random()-0.5);
+    frame(`<div class="center" style="padding:8px 0"><div class="hz">${esc(w.hanzi)}</div><p class="muted">${esc(w.pinyin)} — chọn nghĩa đúng</p></div>
+      <div id="opts">${opts.map(o=>`<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`);
+    root.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+      const ok=b.dataset.v===w.vi;
+      root.querySelectorAll('.opt').forEach(x=>{x.disabled=true; if(x.dataset.v===w.vi)x.classList.add('ok'); else if(x===b)x.classList.add('no');});
+      setTimeout(()=>grade(item, ok?2:0), ok?650:1300);
+    });
+  }
+  async function finish(early){
+    session.endedAt=now(); session.dur=Math.round((session.endedAt-session.startedAt)/1000); session.week=weekOf(new Date());
+    if(session.reviewed) await sessCol(STATE.code,STATE.sid).add(session);
+    if(early && !session.reviewed){ pageReview(); return; }
+    const acc=session.reviewed?Math.round(session.correct/session.reviewed*100):0;
+    shell(`<div class="card center"><div class="big">${acc>=80?'🎉':'💪'}</div><h2>${early?'Tạm dừng':'Hoàn thành'}!</h2>
+      <p class="muted">${GAME_NAMES[game]}</p>
+      <div class="grid cols3" style="margin-top:14px"><div class="stat"><b>${session.reviewed}</b><span>TỪ</span></div><div class="stat"><b>${acc}%</b><span>ĐÚNG</span></div><div class="stat"><b>${fmtDur(session.dur)}</b><span>THỜI GIAN</span></div></div>
+      <button class="btn block" id="again" style="margin-top:16px">🎮 Ôn tiếp</button>
+      <button class="btn block ghost" id="home" style="margin-top:10px">🏠 Về trang chính</button></div>`);
+    $('#again').onclick=()=>pageReview();
+    $('#home').onclick=()=>go('home');
+  }
+  step();
+}
+
+/* ================= BÀI TẬP SBT ================= */
+function pageSBT(){
+  shell(`<div class="card center">
+    <div class="big">📝</div><h2 style="margin-top:6px">Bài tập Sách bài tập</h2>
+    <p class="muted" style="margin-top:8px">Phần chữa bài tập 6 bài (tự động chấm, hiện đáp án & điểm) đang được cô cập nhật.</p>
+    <p class="muted">Trong lúc chờ, hãy luyện thật chắc từ vựng ở mục <b>Ôn từ vựng</b> nhé! 💪</p>
+    <button class="btn" id="go" style="margin-top:14px">🎮 Qua ôn từ vựng</button>
+  </div>`);
+  $('#go').onclick=()=>go('review');
+}
+
+/* ================= TỔNG QUAN ================= */
+async function pageStats(){
+  shell(`<div class="card center muted">Đang tổng hợp…</div>`);
+  const sess=(await sessCol(STATE.code,STATE.sid).get()).docs.map(d=>d.data());
+  const cards=Object.values(CARDS);
+  const totSec=sess.reduce((n,s)=>n+(s.dur||0),0);
+  const rev=sess.reduce((n,s)=>n+(s.reviewed||0),0), corr=sess.reduce((n,s)=>n+(s.correct||0),0);
+  const acc=rev?Math.round(corr/rev*100):0;
+  const mastered=ALLWORDS.filter(w=>masteryOf(w.id)>=5).length;
+  const learned=cards.length;
+  const weak=cards.filter(c=>(c.wrong||0)>(c.correct||0)).map(c=>WORDMAP[c.wid]).filter(Boolean);
+  const lesDone=LESSONS.filter(l=>l.words.every(w=>masteryOf(w.id)>=5)).length;
+  shell(`
+    <div class="card"><h2>📊 Tổng quan học tập</h2>
+      <div class="grid cols3" style="margin-top:14px">
+        <div class="stat"><b>${ME.streak||0}</b><span>CHUỖI 🔥</span></div>
+        <div class="stat"><b>${(ME.days||[]).length}</b><span>NGÀY HỌC</span></div>
+        <div class="stat"><b>${fmtDur(totSec)}</b><span>TỔNG T.GIAN</span></div>
+        <div class="stat"><b>${learned}</b><span>TỪ ĐÃ HỌC</span></div>
+        <div class="stat"><b>${mastered}</b><span>TỪ ĐÃ THUỘC</span></div>
+        <div class="stat"><b>${acc}%</b><span>ĐỘ CHÍNH XÁC</span></div>
+      </div>
+      <p class="muted" style="margin-top:12px">Đã học xong <b>${lesDone}/${LESSONS.length}</b> bài · tổng <b>${rev}</b> lượt ôn trong <b>${sess.length}</b> buổi.</p>
+    </div>
+    <div class="card"><h3>📈 Tiến độ từng bài</h3>
+      <div style="margin-top:10px">${LESSONS.map(l=>{const tot=l.words.length;const mas=l.words.filter(w=>masteryOf(w.id)>=5).length;const pct=Math.round(mas/tot*100);
+        return `<div style="margin-bottom:12px"><div class="spread" style="margin-bottom:5px"><span style="font-weight:800">${esc(l.title)}</span><span class="muted" style="font-weight:800">${mas}/${tot}</span></div><div class="progressbar"><i style="width:${pct}%"></i></div></div>`;}).join('')}</div>
+    </div>
+    <div class="card"><h3>⚠️ Từ cần ôn thêm (${weak.length})</h3>
+      ${weak.length?`<div style="margin-top:10px">${weak.slice(0,30).map(w=>`<div class="vrow"><div class="vtop"><span class="vh">${esc(w.hanzi)}</span><span class="vp">${esc(w.pinyin)}</span><span style="margin-left:auto">${mbar(masteryOf(w.id))}</span></div><div class="vvi">${esc(w.vi)}</div></div>`).join('')}</div>
+        <button class="btn block coral" id="fixweak" style="margin-top:12px">🎯 Ôn ngay nhóm từ yếu</button>`
+      :`<p class="muted" style="margin-top:8px">Chưa có từ nào bị sai nhiều — giỏi quá! 🌟</p>`}
+    </div>`);
+  if(weak.length){ $('#fixweak').onclick=()=>{ // ôn riêng nhóm yếu bằng thẻ lật
+    startGameFromWords('flash',weak); }; }
+}
+function startGameFromWords(game,words){
+  // tạm thời dùng chọn nghĩa/flash trên danh sách tuỳ ý
+  const ids=new Set(words.map(w=>w.id));
+  const saved=ALLWORDS.slice();
+  // dùng buildQueue 'all' rồi lọc — đơn giản: gọi startGame với scope all nhưng lọc
+  const queue=words.map(w=>({w,card:CARDS[w.id]||{wid:w.id,lessonId:w.lessonId,reps:0,ease:2.3,interval:0,due:'',correct:0,wrong:0,seen:0,mastery:0}}));
+  // tái dùng startGame bằng cách tạm thay thế: đơn giản hoá -> gọi startGame trên 1 "ảo"
+  _customQueue=queue; startGame(game,'_custom',null);
+}
+let _customQueue=null;
+// mở rộng buildQueue cho scope _custom
+const _origBuildQueue=buildQueue;
+buildQueue=function(scope,lid){ if(scope==='_custom'&&_customQueue){const q=_customQueue;_customQueue=null;return q;} return _origBuildQueue(scope,lid); };
+
+/* ================= BẢNG XẾP HẠNG ================= */
+async function pageRank(){
+  shell(`<div class="card center muted">Đang xếp hạng…</div>`);
+  const stus=await stuCol(STATE.code).get();
+  const rows=[];
+  for(const s of stus.docs){ const d=s.data();
+    const cards=(await cardsCol(STATE.code,s.id).get()).docs.map(x=>x.data());
+    const pts=cards.reduce((n,c)=>n+(c.mastery||0),0);
+    const mastered=cards.filter(c=>(c.mastery||0)>=5).length;
+    rows.push({id:s.id,name:d.name,streak:d.streak||0,learned:cards.length,mastered,pts});
+  }
+  rows.sort((a,b)=> b.pts-a.pts || b.mastered-a.mastered || b.streak-a.streak);
+  const medal=i=>i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+  shell(`<div class="card">
+    <div class="spread"><h2>🏆 Bảng xếp hạng lớp ${esc(STATE.codeShort||STATE.code)}</h2><span class="pill">${rows.length} bạn</span></div>
+    <p class="muted" style="margin-top:4px">Điểm = tổng mức thành thạo của tất cả các từ. Chăm ôn là leo hạng! 🚀</p>
+    <div style="margin-top:14px">${rows.map((r,i)=>`<div class="rankrow ${r.id===STATE.sid?'me':''}">
+      <div class="rankno">${medal(i)}</div>
+      <div style="flex:1;min-width:0"><b>${esc(r.name)}${r.id===STATE.sid?' (bạn)':''}</b><div class="muted" style="font-size:.82rem;font-weight:700">💎 ${r.mastered} thuộc · 📖 ${r.learned} đã học · 🔥 ${r.streak}</div></div>
+      <div class="big" style="font-size:1.4rem;color:var(--brand-d)">${r.pts}</div>
+    </div>`).join('')}</div>
+  </div>`);
+}
+
+/* ================= tiện ích thời gian ================= */
+function weekOf(d){const o=new Date(d);const day=(o.getDay()+6)%7;o.setDate(o.getDate()-day);return o.toISOString().slice(0,10);}
+function fmtDur(s){s=s||0;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);if(h)return `${h}h${String(m).padStart(2,'0')}`;return m?`${m}p${String(s%60).padStart(2,'0')}`:`${s}s`;}
+
+/* ================= TRANG CHỦ / ĐĂNG NHẬP ================= */
+const COURSES=[
+  {id:'HSK1',sub:'Bắt đầu từ con số 0',       img:'c1.png',color:'#e8573f',ready:false},
+  {id:'HSK2',sub:'Giao tiếp cơ bản',          img:'c2.png',color:'#2f7fd6',ready:false},
+  {id:'HSK3',sub:'Tự tin nói – Hiểu sâu hơn', img:'c3.png',color:'#17936b',ready:true },
+  {id:'HSK4',sub:'Nâng cao kỹ năng',          img:'c4.png',color:'#8257c4',ready:false},
+  {id:'HSK5',sub:'Thành thạo tiếng Trung',    img:'c5.png',color:'#2f6fd6',ready:false}
+];
+function slug(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/[^a-z0-9]/g,'');}
+const mkCid=(lvl,ts,code)=>lvl+'__'+ts+'__'+code;
+const ZALO='https://zalo.me/0368280988';
+const soon=()=>toast('🚧 Mục này sắp ra mắt nha');
+
+function viewLanding(){ showLanding(); }
+function pickCourse(id){ const c=COURSES.find(x=>x.id===id); if(!c)return; if(!c.ready) return toast('🚧 '+id+' sắp ra mắt nha'); if(!FB_OK) return toast('Chưa kết nối máy chủ, thử lại sau'); viewLogin(id); }
+
+function viewLogin(courseId){
+  STATE.courseId=courseId; STATE.authTab=STATE.authTab||'student';
+  const tab=STATE.authTab;
+  render(`<div class="wrap" style="max-width:560px"><div class="card login-compact">
+    <p style="margin:0 0 4px"><button class="linklike" id="back">← Về trang chủ</button></p>
+    <div class="center"><div class="avatar" style="width:52px;height:52px;margin-bottom:6px"><img src="assets/avatar.png" alt=""></div><div><span class="coursebadge">📘 ${esc(courseId)}</span></div></div>
+    <h2 class="center" style="margin-top:6px">Vào lớp ${esc(courseId)}</h2>
+    <div class="seg" style="margin-top:16px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
+    <div id="form" style="margin-top:16px"></div>
+  </div></div>`);
+  $('#back').onclick=viewLanding;
+  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{STATE.authTab=b.dataset.tab;viewLogin(courseId);});
+  const f=$('#form');
+  if(tab==='student'){
+    f.innerHTML=`
+      <div class="field ico"><label>Mã lớp</label><span class="ic">🎫</span><input id="code" placeholder="VD: A1" autocapitalize="characters" value="${esc(lsGet('lastCode',''))}"></div>
+      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
+      <div class="field ico"><label>Tên của bạn</label><span class="ic">🙂</span><input id="name" placeholder="VD: Minh Anh"></div>
+      <div class="field ico"><label>Mã PIN (4 số, tự đặt)</label><span class="ic">🔒</span><input id="pin" inputmode="numeric" placeholder="VD: 1234"></div>
+      <button class="btn block" id="go">Vào học 🚀</button>
+      <p class="muted" style="margin-top:10px;font-size:.84rem">Nhập đúng mã lớp + tên cô của lớp bạn. Lần đầu nhập tên + PIN để tạo tài khoản; lần sau dùng lại đúng tên + PIN.</p>`;
+    $('#go').onclick=async()=>{
+      const code=$('#code').value.trim().toUpperCase(), tn=$('#tname').value.trim(), name=$('#name').value.trim(), pin=$('#pin').value.trim();
+      if(!code||!tn||!name||!pin) return toast('Điền đủ thông tin nha');
+      const cid=mkCid(courseId,slug(tn),code);
+      try{
+        const snap=await clsRef(cid).get();
+        if(!snap.exists) return toast('Chưa có lớp này — kiểm tra lại mã lớp & tên cô');
+        STATE.code=cid; STATE.codeShort=code; STATE.cls=snap.data(); STATE.teacher=snap.data().teacher||tn;
+        lsSet('lastCode',code); lsSet('lastTeacher',tn);
+        const sid=slug(name)+'_'+pin; const ref=stuRef(cid,sid); const ss=await ref.get();
+        if(!ss.exists) await ref.set({name,pin,createdAt:now(),streak:0,lastDay:'',days:[]});
+        else if(ss.data().pin!==pin) return toast('Sai PIN rồi nha');
+        STATE.sid=sid; STATE.role='student';
+        await loadMe(); await loadCards(); ROUTE='home'; pageHome();
+      }catch(e){ console.error(e); toast('Lỗi kết nối, thử lại'); }
+    };
+  }else{
+    f.innerHTML=`
+      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
+      <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="pw" placeholder="mật khẩu"></div>
+      <button class="btn block" id="go">Vào bảng điều khiển</button>
+      <p class="muted" style="margin-top:10px">Chưa có lớp? <button class="linklike" id="mk">Tạo lớp mới</button></p>`;
+    $('#mk').onclick=()=>viewCreateClass(courseId);
+    $('#go').onclick=async()=>{
+      const tn=$('#tname').value.trim(), pw=$('#pw').value.trim(); if(!tn||!pw) return toast('Điền tên + mật khẩu');
+      try{
+        const q=await db.collection('classes').where('level','==',courseId).where('teacherSlug','==',slug(tn)).where('pin','==',pw).get();
+        if(q.empty) return toast('Sai tên giáo viên hoặc mật khẩu');
+        lsSet('lastTeacher',tn);
+        if(q.docs.length===1){ enterTeacher(q.docs[0]); }
+        else{
+          render(`<div class="wrap"><div class="card"><h2>Chọn lớp để quản lý</h2><div class="grid" style="margin-top:12px" id="pick"></div>
+            <p class="center" style="margin-top:12px"><button class="linklike" id="b">← Quay lại</button></p></div></div>`);
+          $('#b').onclick=()=>viewLogin(courseId);
+          const pk=$('#pick'); q.docs.forEach(d=>{const b=document.createElement('button');b.className='listbtn';b.innerHTML=`<div class="spread"><b>Lớp ${esc(d.data().code)}</b><span class="pill">${esc(d.data().level)}</span></div>`;b.onclick=()=>enterTeacher(d);pk.appendChild(b);});
+        }
+      }catch(e){ console.error(e); toast('Lỗi kết nối'); }
+    };
+  }
+}
+function enterTeacher(doc){ const d=doc.data(); STATE.code=doc.id; STATE.codeShort=d.code; STATE.courseId=d.level; STATE.cls=d; STATE.teacher=d.teacher; STATE.role='teacher'; viewTeacher(); }
+
+function viewCreateClass(courseId){
+  courseId=courseId||STATE.courseId||'HSK3';
+  render(`<div class="wrap"><div class="card"><h2>Tạo lớp mới · ${esc(courseId)}</h2><p class="muted">Dành cho giáo viên.</p>
+    <div style="margin-top:14px">
+    <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tn" placeholder="VD: Cô Ngọ"></div>
+    <div class="field ico"><label>Mã lớp (học viên sẽ nhập)</label><span class="ic">🎫</span><input id="c" placeholder="VD: A1" autocapitalize="characters"></div>
+    <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="p" placeholder="VD: 2468"></div>
+    <button class="btn block" id="save">Tạo lớp</button>
+    <p class="center" style="margin-top:12px"><button class="linklike" id="back">← Quay lại</button></p></div></div></div>`);
+  $('#back').onclick=()=>viewLogin(courseId);
+  $('#save').onclick=async()=>{
+    const tn=$('#tn').value.trim(), c=$('#c').value.trim().toUpperCase(), p=$('#p').value.trim();
+    if(!tn||!c||!p) return toast('Điền đủ tên cô + mã lớp + mật khẩu');
+    const cid=mkCid(courseId,slug(tn),c);
+    const ex=await clsRef(cid).get(); if(ex.exists) return toast('Lớp này (cô + mã) đã tồn tại');
+    const data={level:courseId,teacher:tn,teacherSlug:slug(tn),code:c,pin:p,createdAt:now()};
+    await clsRef(cid).set(data);
+    toast('Đã tạo lớp 🎉'); STATE.code=cid; STATE.codeShort=c; STATE.courseId=courseId; STATE.cls=data; STATE.teacher=tn; STATE.role='teacher'; viewTeacher();
+  };
+}
+
+/* ================= GIÁO VIÊN ================= */
+function viewTeacher(tab){
+  tab=tab||'dash';
+  render(`<div class="wrap"><div class="card">
+    <div class="apphero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="assets/avatar.png" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Bảng điều khiển · ${esc(STATE.courseId||'')} · Lớp ${esc(STATE.codeShort||STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div></div>
+    <div class="seg" style="margin-top:16px"><button data-t="dash" class="${tab==='dash'?'on':''}">Học viên</button><button data-t="content" class="${tab==='content'?'on':''}">Nội dung bài</button></div>
+    <div id="panel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
+    <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
+  root.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>viewTeacher(b.dataset.t));
+  $('#out').onclick=()=>{STATE.role=null;viewLanding();};
+  tab==='dash'?teacherDash():teacherContent();
+}
+async function teacherDash(){
+  const panel=$('#panel'); const stus=await stuCol(STATE.code).get();
+  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào đăng nhập.<br>Chia sẻ mã lớp <b>${esc(STATE.codeShort||STATE.code)}</b> + tên cô cho các em nhé.</div>`; return; }
+  const rows=[];
+  for(const s of stus.docs){ const d=s.data();
+    const cards=(await cardsCol(STATE.code,s.id).get()).docs.map(x=>x.data());
+    const sess=(await sessCol(STATE.code,s.id).get()).docs.map(x=>x.data());
+    const weak=cards.filter(c=>(c.wrong||0)>(c.correct||0)).length;
+    const mastered=cards.filter(c=>(c.mastery||0)>=5).length;
+    const totSec=sess.reduce((n,x)=>n+(x.dur||0),0), rev=sess.reduce((n,x)=>n+(x.reviewed||0),0), corr=sess.reduce((n,x)=>n+(x.correct||0),0);
+    rows.push({name:d.name,streak:d.streak||0,learned:cards.length,mastered,weak,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,_sess:sess}); }
+  const avgAcc=rows.length?Math.round(rows.reduce((n,r)=>n+r.acc,0)/rows.length):0;
+  let html=`<div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>HỌC VIÊN</span></div><div class="stat"><b>${avgAcc}%</b><span>ĐÚNG TB</span></div><div class="stat"><b>${rows.reduce((n,r)=>n+r.mastered,0)}</b><span>TỪ THUỘC</span></div></div>
+    <div class="row" style="margin:14px 0"><button class="btn sm" id="csv">⬇️ Xuất CSV để phân tích</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Tên</th><th>🔥</th><th>Đã học</th><th>Thuộc</th><th>Từ yếu</th><th>Buổi</th><th>T.gian</th><th>Đúng</th></tr></thead><tbody>`;
+  rows.forEach(r=>html+=`<tr><td>${esc(r.name)}</td><td>${r.streak}</td><td>${r.learned}</td><td>${r.mastered}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${fmtDur(r.time)}</td><td>${r.acc}%</td></tr>`);
+  html+='</tbody></table></div>'; panel.innerHTML=html;
+  $('#csv').onclick=()=>exportCSV(rows);
+}
+function exportCSV(rows){
+  let lines=[['Tên','Chuỗi','Đã học','Thuộc','Từ yếu','Số buổi','Tổng giây','% đúng'].join(',')];
+  rows.forEach(r=>lines.push([r.name,r.streak,r.learned,r.mastered,r.weak,r.sessions,r.time,r.acc].join(',')));
+  lines.push(''); lines.push(['Tên','Tuần','Ngày','Kiểu','Số từ','Đúng','Sai','Giây'].join(','));
+  rows.forEach(r=>r._sess.forEach(s=>lines.push([r.name,s.week||'',new Date(s.startedAt).toISOString().slice(0,10),s.game||'',s.reviewed||0,s.correct||0,s.wrong||0,s.dur||0].join(','))));
+  const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='xiaoyu_'+(STATE.codeShort||'lop')+'_'+todayKey()+'.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function teacherContent(){
+  const panel=$('#panel');
+  let html=`<p class="muted">Nội dung 6 bài (${TOTAL_WORDS} từ) đã nạp sẵn trong hệ thống. Học viên học & ôn theo đây.</p>`;
+  LESSONS.forEach(l=>{
+    html+=`<div class="soft" style="padding:14px;margin-top:12px"><div class="spread"><b>${esc(l.title)}</b><span class="pill">${l.words.length} từ</span></div>
+      <div class="tbl-wrap" style="margin-top:8px"><table><tbody>`;
+    l.words.forEach(w=>html+=`<tr><td style="font-family:'Baloo 2'">${esc(w.hanzi)}</td><td>${esc(w.pinyin)}</td><td class="muted">${esc(w.pos)}</td><td>${esc(w.vi)}</td></tr>`);
+    html+=`</tbody></table></div></div>`;
+  });
+  panel.innerHTML=html;
+}
+
+initLanding();
