@@ -110,9 +110,9 @@ td{font-variant-numeric:tabular-nums}
 .chip{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   color:var(--brand-d);font-weight:800;font-size:.78rem;padding:7px 14px;border-radius:999px;box-shadow:var(--shadow-sm)}
 .logincard{max-width:430px;margin:0 auto;text-align:center}
-.avatar{width:76px;height:76px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,#5bc0ea,var(--brand-d));
-  display:grid;place-items:center;color:#fff;font-family:'Baloo 2';font-weight:800;font-size:2.4rem;
-  box-shadow:0 10px 26px rgba(29,135,192,.38);border:4px solid rgba(255,255,255,.75)}
+.avatar{width:92px;height:92px;border-radius:50%;margin:0 auto 10px;overflow:hidden;
+  box-shadow:0 10px 26px rgba(29,135,192,.38);border:4px solid rgba(255,255,255,.85);background:#fff}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .logincard .lname{font-family:'Baloo 2';font-size:1.2rem;display:block}
 .logincard .motto{color:var(--muted);margin:8px 0 16px}
 footer{color:var(--muted);font-size:.8rem;text-align:center;padding:18px}
@@ -198,14 +198,13 @@ function viewLanding(){
     <div class="chips">
       <span class="chip">专业教学 · Giảng dạy chuyên nghiệp</span>
       <span class="chip">发音标准 · Chuẩn phát âm</span>
-      <span class="chip">语法精讲 · Giải thích ngữ pháp dễ hiểu</span>
       <span class="chip">高效学习 · Học tập hiệu quả</span>
     </div>
     <div class="card logincard">
-      <div class="avatar">玉</div>
-      <span class="lname">XiaoYu 小玉</span>
-      <small class="muted" style="font-weight:700">词汇闯关 · Chinh phục từ vựng</small>
-      <p class="motto">Nhớ từ mỗi ngày, nói được mỗi tuần 🌤️</p>
+      <div class="avatar"><img src="avatar.jpg" alt="XiaoYu Class"></div>
+      <span class="lname">XiaoYu Class</span>
+      <small class="muted" style="font-weight:700">LỚP HỌC TIẾNG TRUNG CÁ NHÂN HÓA</small>
+      <p class="motto">Học chắc – Hiểu sâu – Nhớ lâu</p>
       <div class="field ico" style="text-align:left"><label>Mã lớp</label><span class="ic">🎫</span><input id="code" placeholder="VD: HSK3A" autocapitalize="characters" value="${esc(lsGet('lastCode',''))}"></div>
       <button class="btn block" id="go">Vào lớp →</button>
       <p class="muted" style="margin-top:14px">Bạn là giáo viên? <button class="linklike" id="mk">Tạo lớp mới</button></p>
