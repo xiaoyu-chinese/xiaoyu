@@ -403,7 +403,7 @@ window.VOCAB = {
     {
       id: "L1",
       title: "Bài 1 · 我们去机场接你们",
-      titleVi: "Chúng tôi ra sân bay đón các bạn",
+      titleVi: "Anh chị sẽ đến sân bay đón các em",
       words: [
         { id:"L1-01", hanzi:"以为",  pinyin:"yǐwéi",    pos:"đgt", vi:"cho rằng, tưởng rằng", ex:"我还以为是同乐呢。", exVi:"Tôi còn tưởng là Đồng Lạc cơ." },
         { id:"L1-02", hanzi:"像",    pinyin:"xiàng",    pos:"đgt", vi:"giống, giống như",     ex:"他们看上去有点儿像。", exVi:"Trông họ hơi giống nhau." },
@@ -437,7 +437,7 @@ window.VOCAB = {
     {
       id: "L2",
       title: "Bài 2 · 你们想吃什么就点什么",
-      titleVi: "Các bạn muốn ăn gì thì gọi món đó",
+      titleVi: "Các em muốn ăn món gì thì gọi món đó",
       words: [
         { id:"L2-01", hanzi:"菜单",  pinyin:"càidān",   pos:"dt",  vi:"thực đơn",             ex:"你们看看菜单。", exVi:"Các cậu xem thực đơn đi." },
         { id:"L2-02", hanzi:"又",    pinyin:"yòu",      pos:"phó", vi:"lại, vừa",             ex:"现在还真是又饿又渴。", exVi:"Giờ đúng là vừa đói vừa khát." },
@@ -505,7 +505,7 @@ window.VOCAB = {
     {
       id: "L4",
       title: "Bài 4 · 这家宾馆跟别的都不一样",
-      titleVi: "Khách sạn này không giống những khách sạn khác",
+      titleVi: "Khách sạn này không giống như những khách sạn khác",
       words: [
         { id:"L4-01", hanzi:"假期",  pinyin:"jiàqī",    pos:"dt",  vi:"kỳ nghỉ",              ex:"这个假期咱们去哪儿玩玩吧。", exVi:"Kỳ nghỉ này chúng ta đi đâu chơi đi." },
         { id:"L4-02", hanzi:"海",    pinyin:"hǎi",      pos:"dt",  vi:"biển",                 ex:"你喜欢海，找个海边住几天。", exVi:"Cậu thích biển, tìm chỗ ven biển ở vài hôm." },
@@ -1183,7 +1183,7 @@ const SBT_CFG = {
   // Audio để trong repo GitHub, thư mục "audio/" (miễn phí, không cần Firebase Storage).
   audioBase: 'Audio/sbt/',
   // URL Cloud Function chấm 造句 bằng AI (điền sau khi deploy). Để trống = chưa bật.
-  gradeFnUrl: ''
+  gradeFnUrl: 'https://xiaoyu-grade.tvtt8888.workers.dev'
 };
 const sbtAudioUrl = f => SBT_CFG.audioBase + f;
 const sbtCol = () => stuRef(STATE.code, STATE.sid).collection('sbt');
@@ -1191,7 +1191,7 @@ const sbtCol = () => stuRef(STATE.code, STATE.sid).collection('sbt');
 /* ---------------- DỮ LIỆU BÀI 1 ---------------- */
 const SBT_UNITS = [
 {
-  id:1, title:'我们去机场接你们', titleVi:'Chúng tôi ra sân bay đón các bạn', audio:'sbt-1.mp3', ready:true,
+  id:1, title:'我们去机场接你们', titleVi:'Anh chị sẽ đến sân bay đón các em', audio:'sbt-1.mp3', ready:true,
   listening:{
     pics:{A:SBT_IMG.L_A,B:SBT_IMG.L_B,C:SBT_IMG.L_C,D:SBT_IMG.L_D},
     part1:{ note:'Nghe hội thoại, chọn tranh đúng (A–D). Mỗi câu nghe 2 lần.',
