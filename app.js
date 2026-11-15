@@ -79,32 +79,42 @@ async function loadMe(){ ME=(await stuRef(STATE.code,STATE.sid).get()).data();
 async function loadCards(){ const snap=await cardsCol(STATE.code,STATE.sid).get(); CARDS={}; snap.docs.forEach(d=>CARDS[d.id]=d.data()); }
 async function saveCard(c){ const {_word,...save}=c; await cardsCol(STATE.code,STATE.sid).doc(c.wid).set(save,{merge:true}); CARDS[c.wid]=save; }
 
-/* ================= SHELL (banner + sidebar) ================= */
-const NAV=[
-  {id:'home',  ic:'🏠', t:'Trang chính'},
-  {id:'list',  ic:'📖', t:'List từ vựng'},
-  {id:'review',ic:'🎮', t:'Ôn từ vựng'},
-  {id:'sbt',   ic:'📝', t:'Bài tập SBT'},
-  {id:'stats', ic:'📊', t:'Tổng quan'},
-  {id:'rank',  ic:'🏆', t:'Xếp hạng'}
+/* ================= SHELL 3 CỘT (topbar + sidebar khóa học + main + rail) ================= */
+const NAV_GROUPS=[
+  {items:[{id:'classroom',ic:'🏫',t:'Lớp học trực tuyến',live:true}]},
+  {items:[
+    {id:'lessons', ic:'📚', t:'Danh sách bài học'},
+    {id:'home',    ic:'📘', t:'Tổng quan khóa học'},
+    {id:'exercise',ic:'📝', t:'Bài tập SBT'},
+  ]},
+  {label:'CÔNG CỤ HỌC TẬP',items:[
+    {id:'review', ic:'🔁', t:'Ôn tập thông minh'},
+    {id:'list',   ic:'📖', t:'Sổ tay từ vựng'},
+    {id:'mywords',ic:'⭐', t:'Từ vựng của tôi'},
+    {id:'stats',  ic:'📊', t:'Thống kê & Tiến bộ'},
+    {id:'rank',   ic:'🏆', t:'Xếp hạng'},
+  ]},
 ];
-function banner(){return `<div class="banner"><div class="banner-in">
-  <div class="b-logo"><img src="assets/avatar.png" alt="XiaoYu"></div>
-  <div class="b-main">
-    <div class="b-title">Học tiếng Trung cùng XiaoYu</div>
-    <div class="b-sub">Ôn thi HSK1–4 · Lớp học tiếng Trung nhóm nhỏ · Dạy kỹ, học kỹ, tiến bộ mỗi ngày</div>
-  </div>
-  <a class="b-zalo" href="https://zalo.me/0368280988" target="_blank" rel="noopener">💬 Zalo 0368 280 988</a>
-</div></div>`;}
-function shell(inner){
-  render(`${banner()}<div class="shell">
-    <nav class="sidebar">
-      ${NAV.map(n=>`<button class="navbtn ${ROUTE===n.id?'on':''}" data-r="${n.id}"><span class="ni">${n.ic}</span><span class="nlabel">${n.t}</span></button>`).join('')}
-      <button class="navbtn out" data-r="_out"><span class="ni">🚪</span><span class="nlabel">Đăng xuất</span></button>
-    </nav>
-    <main class="content">${inner}</main>
+function xtopbar(){return `<div class="xtop">
+  <a class="xbrand" href="#" data-r="home"><img src="assets/avatar.png" alt="XiaoYu"><div><b>XiaoYu Chinese</b><small>Học tiếng Trung – Vững tương lai</small></div></a>
+  <div class="xtop-r"><div class="xbell">🔔</div><img class="xava" src="assets/avatar.png" alt="Avatar"></div>
+</div>`;}
+function xcourse(){const cid=esc(STATE.courseId||'HSK3');
+  return `<div class="xcourse" style="background-image:url(assets/hsk3.jpg)"><span class="xtag">KHÓA HỌC ${cid}</span><h2>${cid}</h2><small>Tự tin nói – Hiểu sâu hơn</small></div>`;}
+function xmenu(){let h='';
+  NAV_GROUPS.forEach(g=>{ if(g.label)h+=`<div class="xlbl">${g.label}</div>`;
+    g.items.forEach(n=>{h+=`<button class="xnav ${ROUTE===n.id?'on':''} ${n.live?'live':''}" data-r="${n.id}"><span class="xic">${n.ic}</span><span class="xt">${n.t}</span>${n.live?'<span class="xlive">LIVE</span>':''}</button>`;});
+  });
+  h+=`<button class="xnav out" data-r="_out"><span class="xic">🚪</span><span class="xt">Đăng xuất</span></button>`;
+  return h;
+}
+function shell(inner,rail){
+  render(`${xtopbar()}<div class="xshell ${rail?'has-rail':''}">
+    <aside class="xside">${xcourse()}<nav class="xmenu">${xmenu()}</nav></aside>
+    <main class="xmain">${inner}</main>
+    ${rail?`<aside class="xrail">${rail}</aside>`:''}
   </div>`);
-  root.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+  root.querySelectorAll('[data-r]').forEach(b=>b.onclick=e=>{e.preventDefault();
     const r=b.dataset.r;
     if(r==='_out'){STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewLanding();return;}
     go(r);
@@ -112,15 +122,243 @@ function shell(inner){
 }
 function go(r){ ROUTE=r;
   if(r==='home')return pageHome();
-  if(r==='list')return pageList();
+  if(r==='lessons')return pageLesson();
+  if(r==='exercise'||r==='sbt')return pageSBT();
   if(r==='review')return pageReview();
-  if(r==='sbt')return pageSBT();
+  if(r==='list')return pageList();
+  if(r==='mywords')return pageMyWords();
   if(r==='stats')return pageStats();
   if(r==='rank')return pageRank();
+  if(r==='classroom')return pageClassroom();
 }
 
-/* ================= TRANG CHÍNH ================= */
+/* ---- phân loại trạng thái từ cho donut / ô thống kê ---- */
+function isWeakCard(c){return c&&((c.wrong||0)>(c.correct||0));}
+function vocabStates(){
+  let g=0,b=0,a=0,wt=0;        // nắm vững / đang học / cần củng cố / chờ ôn
+  ALLWORDS.forEach(w=>{const c=CARDS[w.id];
+    if(!c){wt++;return;}
+    if((c.mastery||0)>=5)g++;
+    else if(isWeakCard(c))a++;
+    else if((c.mastery||0)>=1)b++;
+    else wt++;
+  });
+  return {g,b,a,wt,total:ALLWORDS.length};
+}
+function dueOnKey(k){return ALLWORDS.filter(w=>{const c=CARDS[w.id];return c&&c.due===k;}).length;}
+function keyPlus(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+
+/* ================= DANH SÁCH BÀI HỌC = DASHBOARD ================= */
 function dueList(){return ALLWORDS.filter(w=>{const c=CARDS[w.id];return c&&isDue(c);});}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const POS_FULL={'đgt':'Động từ','dt':'Danh từ','tt':'Tính từ','trt':'Trạng từ','gt':'Giới từ','lt':'Lượng từ','đt':'Đại từ','pt':'Phó từ','lgt':'Liên từ','st':'Số từ','tht':'Thán từ','k':'Trợ từ'};
+let DASH=null;
+function dashInit(){
+  DASH={ queue:shuffle(dueList().slice()).slice(0,15), i:0, wrong:false,
+         session:{startedAt:now(),game:'review_dash',reviewed:0,correct:0,wrong:0,scope:'due'} };
+}
+function pageLesson(id){
+  STATE.lesson=id||STATE.lesson||(LESSONS[0]&&LESSONS[0].id);
+  const lesson=LESSONS.find(l=>l.id===STATE.lesson)||LESSONS[0];
+  if(!lesson){ shell(`<div class="card center muted">Chưa có dữ liệu bài học.</div>`); return; }
+  const zh=lesson.title.split('·').pop().trim();
+  const lesNo=LESSONS.indexOf(lesson)+1;
+  if(!DASH) dashInit();
+  // tiến độ bài: số từ của bài đã "học" (có card) & đã thuộc
+  const lw=lesson.words; const lLearned=lw.filter(w=>CARDS[w.id]).length; const lMastered=lw.filter(w=>masteryOf(w.id)>=5).length;
+  const lessonTabs=LESSONS.map(l=>`<button class="xls ${l.id===lesson.id?'on':''}" data-les="${l.id}">Bài ${LESSONS.indexOf(l)+1}</button>`).join('');
+
+  const main=`
+    <div class="xhero" style="background-image:url(assets/hsk3.jpg)">
+      <div class="xhero-in">
+        <div class="xcrumb">Khóa học › ${esc(STATE.courseId||'HSK3')} › <b>Bài ${lesNo}</b></div>
+        <div class="xhero-t"><h1>${esc(STATE.courseId||'HSK3')} – Bài ${lesNo}: ${esc(zh)}</h1><button class="xplay" id="les-audio">▶</button></div>
+        <div class="xhero-s">${esc(lesson.titleVi||'')}</div>
+      </div>
+    </div>
+
+    <div class="xlstabs">${lessonTabs}</div>
+
+    <div class="xcard xflowc">
+      <div class="xflow">
+        <div class="xstep done"><div class="xn">✓</div><div><div class="zh">间隔复习</div><div class="vi">Ôn tập từ cũ</div></div></div>
+        <div class="xstep cur"><div class="xn">2</div><div><div class="zh">今日新词</div><div class="vi">Từ mới bài này</div></div></div>
+        <div class="xstep"><div class="xn">3</div><div><div class="zh">SBT 练习</div><div class="vi">Bài tập sách</div></div></div>
+        <div class="xstep"><div class="xn">4</div><div><div class="zh">自由练习</div><div class="vi">Luyện tập tự chọn</div></div></div>
+      </div>
+    </div>
+
+    <div class="xcard">
+      <div class="xsec"><div class="xsec-ic">🔁</div><h3>间隔复习 – Ôn tập từ cũ</h3><span class="xreq">📌 Bắt buộc</span></div>
+      <p class="muted" style="margin:2px 0 0;font-size:.9rem">Ôn lại từ vựng theo lịch cá nhân hóa dựa trên kết quả học tập và mức độ ghi nhớ.</p>
+      <div class="xstats4">
+        <div class="xsc c-blue"><div class="si">🗂️</div><div><b id="st-today">0</b><span>từ trong lượt ôn</span></div></div>
+        <div class="xsc c-green"><div class="si">🎯</div><div><b id="st-due">0</b><span>từ đến hạn ôn</span></div></div>
+        <div class="xsc c-amber"><div class="si">⚠️</div><div><b id="st-weak">0</b><span>từ cần củng cố</span></div></div>
+        <div class="xsc c-grey"><div class="si">🗓️</div><div><b id="st-wait">0</b><span>từ đang chờ ôn</span></div></div>
+      </div>
+      <div class="xfc" id="dash-fc"></div>
+    </div>`;
+
+  const rail=`
+    <div class="xpanel">
+      <h4><span class="pi">📈</span> Tiến độ học Bài ${lesNo} <a id="les-pct">${Math.round(lMastered/Math.max(1,lw.length)*100)}%</a></h4>
+      <div class="xpbar"><i style="width:${Math.round(lLearned/Math.max(1,lw.length)*100)}%"></i></div>
+      <div class="xchk done"><span class="b">✓</span><span class="zh">间隔复习</span> – Ôn tập từ cũ <span class="val">Đang ôn</span></div>
+      <div class="xchk"><span class="b"></span><span class="zh">今日新词</span> – Từ mới <span class="val">${lLearned}/${lw.length}</span></div>
+      <div class="xchk"><span class="b"></span><span class="zh">SBT 练习</span> – Bài tập <span class="val">0/3</span></div>
+      <div class="xchk"><span class="b"></span><span class="zh">自由练习</span> – Tự chọn <span class="val">--</span></div>
+    </div>
+    <div class="xpanel">
+      <h4><span class="pi">🫧</span> Tình trạng từ vựng của bạn</h4>
+      <div class="xdonut-wrap">
+        <div class="xdonut"><svg viewBox="0 0 42 42" width="118" height="118">
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#eef3f9" stroke-width="5"></circle>
+          <circle id="dg" cx="21" cy="21" r="15.9" fill="none" stroke="#23b386" stroke-width="5" stroke-dasharray="0 100" stroke-dashoffset="25" stroke-linecap="round"></circle>
+          <circle id="db" cx="21" cy="21" r="15.9" fill="none" stroke="#2f9fd6" stroke-width="5" stroke-dasharray="0 100" stroke-dashoffset="25" stroke-linecap="round"></circle>
+          <circle id="da" cx="21" cy="21" r="15.9" fill="none" stroke="#f0a500" stroke-width="5" stroke-dasharray="0 100" stroke-dashoffset="25" stroke-linecap="round"></circle>
+          <circle id="dw" cx="21" cy="21" r="15.9" fill="none" stroke="#b9c7d6" stroke-width="5" stroke-dasharray="0 100" stroke-dashoffset="25" stroke-linecap="round"></circle>
+        </svg><div class="ctr"><b id="d-total">0</b><span>Từ vựng</span></div></div>
+        <div class="xlegend">
+          <div class="lg"><span class="dot" style="background:#23b386"></span>Đã nắm vững <b id="lg-g">0</b><small id="lg-gp">0%</small></div>
+          <div class="lg"><span class="dot" style="background:#2f9fd6"></span>Đang học <b id="lg-b">0</b><small id="lg-bp">0%</small></div>
+          <div class="lg"><span class="dot" style="background:#f0a500"></span>Cần củng cố <b id="lg-a">0</b><small id="lg-ap">0%</small></div>
+          <div class="lg"><span class="dot" style="background:#b9c7d6"></span>Đang chờ ôn <b id="lg-w">0</b><small id="lg-wp">0%</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="xpanel">
+      <h4><span class="pi">🗓️</span> Lịch ôn tập sắp tới</h4>
+      <div class="xsch"><span class="dot" style="background:#2f9fd6"></span><span class="d">Hôm nay</span><span class="v" id="sc0">0 từ</span></div>
+      <div class="xsch"><span class="dot" style="background:#f0a500"></span><span class="d">Ngày mai</span><span class="v" id="sc1">0 từ</span></div>
+      <div class="xsch"><span class="dot" style="background:#b9c7d6"></span><span class="d">Sau 2 ngày</span><span class="v" id="sc2">0 từ</span></div>
+    </div>
+    <div class="xtip"><h4>✨ Gợi ý cho bạn</h4><p id="tip-txt"></p></div>`;
+
+  shell(main,rail);
+  root.querySelectorAll('[data-les]').forEach(b=>b.onclick=()=>{STATE.lesson=b.dataset.les;pageLesson(b.dataset.les);});
+  $('#les-audio')&&($('#les-audio').onclick=()=>toast('Audio bài học sẽ bổ sung sau nhé'));
+  updateDashStats();
+  renderDashCard();
+}
+function updateDashStats(){
+  const s=vocabStates(); const due=dueList().length; const weak=s.a;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('d-total',s.total);
+  const segs=[['dg',s.g],['db',s.b],['da',s.a],['dw',s.wt]]; let off=25;
+  segs.forEach(([id,v])=>{const el=document.getElementById(id);if(!el)return;const pct=s.total?v/s.total*100:0;
+    el.setAttribute('stroke-dasharray',pct.toFixed(2)+' '+(100-pct).toFixed(2));el.setAttribute('stroke-dashoffset',off.toFixed(2));off=(off-pct+100)%100;});
+  const pc=(v)=>s.total?Math.round(v/s.total*100)+'%':'0%';
+  set('lg-g',s.g);set('lg-gp',pc(s.g));set('lg-b',s.b);set('lg-bp',pc(s.b));
+  set('lg-a',s.a);set('lg-ap',pc(s.a));set('lg-w',s.wt);set('lg-wp',pc(s.wt));
+  set('st-due',due);set('st-weak',weak);set('st-wait',s.wt);
+  set('st-today',DASH?DASH.queue.length:Math.min(due,15));
+  set('sc0',dueList().length+' từ');set('sc1',dueOnKey(keyPlus(1))+' từ');set('sc2',dueOnKey(keyPlus(2))+' từ');
+  const tip=document.getElementById('tip-txt');
+  if(tip){ tip.innerHTML = weak>0
+    ? `Bạn có <b>${weak}</b> từ hay quên. Ôn kỹ ở phần <b>间隔复习</b> hoặc <b>Ôn tập thông minh</b> để củng cố nhé!`
+    : (due>0?`Có <b>${due}</b> từ đến hạn ôn hôm nay. Hoàn thành lượt ôn để giữ tiến độ nhé!`:`Tuyệt vời! Hôm nay không còn từ đến hạn. Học <b>今日新词</b> để tiến xa hơn nhé!`); }
+}
+function renderDashCard(){
+  const box=document.getElementById('dash-fc'); if(!box)return;
+  if(!DASH||DASH.i>=DASH.queue.length){
+    const n=DASH?DASH.session.reviewed:0, acc=n?Math.round(DASH.session.correct/n*100):0;
+    box.innerHTML = n
+      ? `<div class="xfc-done"><div class="big">${acc>=80?'🎉':'💪'}</div><h3>Hoàn thành lượt ôn!</h3>
+          <p class="muted">Đã ôn <b>${n}</b> từ · đúng ngay <b>${acc}%</b></p>
+          <button class="xbtn primary" id="fc-more">🔁 Ôn thêm lượt nữa</button></div>`
+      : `<div class="xfc-done"><div class="big">☀️</div><h3>Hôm nay không có từ đến hạn</h3>
+          <p class="muted">Giỏi lắm! Qua <b>Ôn tập thông minh</b> để ôn thêm, hoặc học từ mới của bài.</p>
+          <button class="xbtn primary" id="fc-more">🔁 Ôn lại toàn bộ</button></div>`;
+    const m=document.getElementById('fc-more'); if(m)m.onclick=()=>{DASH={queue:shuffle((dueList().length?dueList():ALLWORDS).slice()).slice(0,15),i:0,wrong:false,session:{startedAt:now(),game:'review_dash',reviewed:0,correct:0,wrong:0,scope:'due'}};renderDashCard();updateDashStats();};
+    return;
+  }
+  const item=DASH.queue[DASH.i]; const w=item;
+  DASH.wrong=false;
+  const others=shuffle(ALLWORDS.filter(x=>x.id!==w.id).slice()).slice(0,3).map(x=>x.vi);
+  const opts=shuffle([w.vi,...others]); const LT=['A','B','C','D'];
+  box.innerHTML=`
+    <div class="xfc-top"><span class="cnt">${DASH.i+1} / ${DASH.queue.length}</span>
+      <div class="prog"><i style="width:${(DASH.i+1)/DASH.queue.length*100}%"></i></div></div>
+    <div class="xfc-body">
+      <div class="xfc-word">
+        <div class="zh">${esc(w.hanzi)}</div>
+        <div class="hint" id="fc-hint">Chọn nghĩa đúng để xem phiên âm &amp; ví dụ</div>
+        <div id="fc-detail" hidden>
+          <div class="py">${esc(w.pinyin)}</div>
+          <div><span class="pos">${esc(POS_FULL[w.pos]||w.pos||'')}</span></div>
+          <div class="mean">${esc(w.vi)}</div>
+          <div class="ex"><span class="lbl">例句</span><span class="zhs">${esc(w.ex||'')}</span><span class="vis">${esc(w.exVi||'')}</span></div>
+        </div>
+      </div>
+      <div class="xopts"><div class="ohd">Chọn nghĩa phù hợp</div><div id="fc-opts">
+        ${opts.map((o,i)=>`<button class="xopt" data-v="${esc(o)}"><span class="k">${LT[i]}</span><span>${esc(o)}</span></button>`).join('')}
+      </div></div>
+    </div>
+    <div class="xfc-fb" id="fc-fb"></div>
+    <div class="xfc-act">
+      <button class="xbtn ghost" id="fc-skip">🕒 Bỏ qua, ôn sau</button>
+      <button class="xbtn primary" id="fc-next" disabled>Tiếp theo ›</button>
+    </div>`;
+  root.querySelectorAll('#fc-opts .xopt').forEach(btn=>btn.onclick=()=>dashPick(btn,btn.dataset.v,item));
+  document.getElementById('fc-skip').onclick=()=>{ const c=getCard(w); c.due=keyPlus(1); saveCard(c); DASH.i++; renderDashCard(); updateDashStats(); };
+  document.getElementById('fc-next').onclick=()=>{ DASH.i++; renderDashCard(); updateDashStats(); };
+}
+function getCard(w){ return CARDS[w.id] || {wid:w.id,lessonId:w.lessonId,reps:0,ease:2.3,interval:0,due:'',correct:0,wrong:0,seen:0,mastery:0}; }
+function dashPick(btn,val,w){
+  const fb=document.getElementById('fc-fb');
+  if(val!==w.vi){ btn.classList.add('wrong'); btn.style.pointerEvents='none'; DASH.wrong=true;
+    fb.className='xfc-fb no'; fb.innerHTML='❌ <b>Chưa đúng.</b>&nbsp;Thử lại nhé!'; return; }
+  // ĐÚNG
+  btn.classList.add('correct');
+  root.querySelectorAll('#fc-opts .xopt').forEach(o=>o.style.pointerEvents='none');
+  document.getElementById('fc-detail').hidden=false;
+  document.getElementById('fc-hint').hidden=true;
+  fb.className='xfc-fb ok'; fb.innerHTML='✅ <b>Chính xác!</b>&nbsp;'+esc(w.hanzi)+' ('+esc(w.pinyin)+'): '+esc(w.vi);
+  document.getElementById('fc-next').disabled=false;
+  // chấm & lưu Firestore (như game Chọn nghĩa)
+  const c=getCard(w); c.wid=w.id; c.lessonId=w.lessonId;
+  schedule(c, DASH.wrong?0:2);
+  DASH.session.reviewed++; DASH.wrong?DASH.session.wrong++:DASH.session.correct++;
+  saveCard(c);
+  // lưu buổi ôn khi xong lượt
+  if(DASH.i+1>=DASH.queue.length) flushDashSession();
+  updateDashStats();
+}
+function flushDashSession(){
+  if(!DASH||!DASH.session.reviewed||DASH.session._saved)return;
+  DASH.session._saved=true;
+  const s=DASH.session; s.endedAt=now(); s.dur=Math.round((s.endedAt-s.startedAt)/1000); s.week=weekOf(new Date());
+  try{ if(FB_OK) sessCol(STATE.code,STATE.sid).add({startedAt:s.startedAt,endedAt:s.endedAt,dur:s.dur,week:s.week,game:s.game,reviewed:s.reviewed,correct:s.correct,wrong:s.wrong,scope:s.scope}); }catch(e){}
+}
+
+/* ================= TỪ VỰNG CỦA TÔI (từ yếu + đã học) ================= */
+function pageMyWords(){
+  const cards=Object.values(CARDS);
+  const weak=cards.filter(isWeakCard).map(c=>WORDMAP[c.wid]).filter(Boolean);
+  const mastered=cards.filter(c=>(c.mastery||0)>=5).map(c=>WORDMAP[c.wid]).filter(Boolean);
+  const vrow=w=>`<div class="vrow"><div class="vtop"><span class="vh">${esc(w.hanzi)}</span><span class="vp">${esc(w.pinyin)}</span><span class="vpos">${esc(w.pos)}</span><span style="margin-left:auto">${mbar(masteryOf(w.id))}</span></div><div class="vvi">${esc(w.vi)}</div></div>`;
+  shell(`
+    <div class="xcard"><div class="spread"><h2>⭐ Từ vựng của tôi</h2><span class="pill">${cards.length} đã học</span></div>
+      <p class="muted" style="margin-top:4px">Theo dõi từ bạn hay sai và từ đã nắm vững.</p></div>
+    <div class="xcard"><div class="spread"><h3>⚠️ Cần củng cố (${weak.length})</h3>${weak.length?`<button class="xbtn primary sm" id="fixweak">🎯 Ôn ngay</button>`:''}</div>
+      ${weak.length?`<div style="margin-top:10px">${weak.slice(0,40).map(vrow).join('')}</div>`:`<p class="muted" style="margin-top:8px">Chưa có từ nào bị sai nhiều — giỏi quá! 🌟</p>`}
+    </div>
+    <div class="xcard"><h3>💎 Đã nắm vững (${mastered.length})</h3>
+      ${mastered.length?`<div style="margin-top:10px">${mastered.slice(0,60).map(vrow).join('')}</div>`:`<p class="muted" style="margin-top:8px">Hãy ôn tập để đưa từ lên mức thành thạo nhé!</p>`}
+    </div>`);
+  if(weak.length){const b=$('#fixweak');if(b)b.onclick=()=>startGameFromWords('mean',weak);}
+}
+
+/* ================= LỚP HỌC TRỰC TUYẾN (đang xây dựng) ================= */
+function pageClassroom(){
+  shell(`<div class="xcard center" style="padding:40px 22px">
+    <div class="big">🏫</div>
+    <h2 style="margin-top:8px">Lớp học trực tuyến</h2>
+    <p class="muted" style="max-width:520px;margin:10px auto 0">Phòng học tương tác thời gian thực (giáo viên tổ chức luyện tập, học sinh trả lời trên thiết bị, AI chấm & ghi nhận lỗi) đang được xây dựng theo từng giai đoạn.</p>
+    <span class="pill coral" style="margin-top:14px;display:inline-block">🚧 Sắp ra mắt</span>
+  </div>`);
+}
 function pageHome(){
   const learned=Object.keys(CARDS).length;
   const due=dueList().length;
@@ -456,7 +694,7 @@ function viewLogin(courseId){
         if(!ss.exists) await ref.set({name,pin,createdAt:now(),streak:0,lastDay:'',days:[]});
         else if(ss.data().pin!==pin) return toast('Sai PIN rồi nha');
         STATE.sid=sid; STATE.role='student';
-        await loadMe(); await loadCards(); ROUTE='home'; pageHome();
+        await loadMe(); await loadCards(); DASH=null; ROUTE='lessons'; pageLesson();
       }catch(e){ console.error(e); toast('Lỗi kết nối, thử lại'); }
     };
   }else{
