@@ -376,15 +376,16 @@ footer{text-align:center;color:#63809c;font-size:12px;padding:0 0 28px}
   padding:7px 15px;border-radius:11px;cursor:pointer}
 .xls.on{background:linear-gradient(135deg,#2f9fd6,#1b6fb8);color:#fff;border-color:transparent;box-shadow:0 4px 11px rgba(47,159,214,.35)}
 
-.xflowc{padding:6px 10px}
-.xflow{display:flex;flex-wrap:wrap}
-.xflow .xstep{flex:1;min-width:150px;display:flex;align-items:center;gap:10px;padding:12px 10px;position:relative}
-.xflow .xn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:#eaf3fd;color:var(--brand-d);flex:none;font-family:'Baloo 2'}
+.xflowc{padding:6px 8px}
+.xflow{display:flex;flex-wrap:nowrap}
+.xflow .xstep{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:8px;padding:11px 5px;position:relative}
+.xflow .xn{width:29px;height:29px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:.82rem;background:#eaf3fd;color:var(--brand-d);flex:none;font-family:'Baloo 2'}
 .xflow .xstep.done .xn{background:var(--good);color:#fff}
 .xflow .xstep.cur .xn{background:linear-gradient(135deg,#2f9fd6,#1b6fb8);color:#fff;box-shadow:0 4px 11px rgba(47,159,214,.4)}
-.xflow .zh{font-family:'Baloo 2';font-weight:700;font-size:1rem;color:var(--ink);line-height:1.1}
-.xflow .vi{font-size:.74rem;color:var(--muted);font-weight:600}
-.xflow .xstep:not(:last-child)::after{content:"›";position:absolute;right:-2px;top:50%;transform:translateY(-50%);color:#b8cde3;font-size:1.3rem}
+.xflow .xstep>div{min-width:0}
+.xflow .zh{font-family:'Baloo 2';font-weight:700;font-size:.9rem;color:var(--ink);line-height:1.1;white-space:nowrap}
+.xflow .vi{font-size:.64rem;color:var(--muted);font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xflow .xstep:not(:last-child)::after{content:"›";position:absolute;right:-1px;top:50%;transform:translateY(-50%);color:#b8cde3;font-size:1.05rem}
 
 .xsec{display:flex;align-items:center;gap:10px}
 .xsec-ic{width:34px;height:34px;border-radius:10px;background:#e7f7f1;display:grid;place-items:center;color:var(--jade);font-size:1.05rem}
@@ -485,4 +486,7 @@ footer{text-align:center;color:#63809c;font-size:12px;padding:0 0 28px}
   .xfc-body{grid-template-columns:1fr}
   .xhero-in{max-width:100%}
   .xhero::after{background:linear-gradient(180deg,rgba(18,61,112,.5),rgba(18,61,112,.82))}
+  .xflow{flex-wrap:wrap}
+  .xflow .xstep{flex:1 1 44%}
+  .xflow .vi{white-space:normal}
 }

@@ -96,11 +96,11 @@ const NAV_GROUPS=[
   ]},
 ];
 function xtopbar(){return `<div class="xtop">
-  <a class="xbrand" href="#" data-r="home"><img src="assets/avatar.png" alt="XiaoYu"><div><b>XiaoYu Chinese</b><small>Học tiếng Trung – Vững tương lai</small></div></a>
-  <div class="xtop-r"><div class="xbell">🔔</div><img class="xava" src="assets/avatar.png" alt="Avatar"></div>
+  <a class="xbrand" href="#" data-r="home"><img src="avatar.png" alt="XiaoYu"><div><b>XiaoYu Chinese</b><small>Học tiếng Trung – Vững tương lai</small></div></a>
+  <div class="xtop-r"><div class="xbell">🔔</div><img class="xava" src="avatar.png" alt="Avatar"></div>
 </div>`;}
 function xcourse(){const cid=esc(STATE.courseId||'HSK3');
-  return `<div class="xcourse" style="background-image:url(assets/hsk3.jpg)"><span class="xtag">KHÓA HỌC ${cid}</span><h2>${cid}</h2><small>Tự tin nói – Hiểu sâu hơn</small></div>`;}
+  return `<div class="xcourse" style="background-image:url(hsk3.jpg)"><span class="xtag">KHÓA HỌC ${cid}</span><h2>${cid}</h2><small>Tự tin nói – Hiểu sâu hơn</small></div>`;}
 function xmenu(){let h='';
   NAV_GROUPS.forEach(g=>{ if(g.label)h+=`<div class="xlbl">${g.label}</div>`;
     g.items.forEach(n=>{h+=`<button class="xnav ${ROUTE===n.id?'on':''} ${n.live?'live':''}" data-r="${n.id}"><span class="xic">${n.ic}</span><span class="xt">${n.t}</span>${n.live?'<span class="xlive">LIVE</span>':''}</button>`;});
@@ -169,7 +169,7 @@ function pageLesson(id){
   const lessonTabs=LESSONS.map(l=>`<button class="xls ${l.id===lesson.id?'on':''}" data-les="${l.id}">Bài ${LESSONS.indexOf(l)+1}</button>`).join('');
 
   const main=`
-    <div class="xhero" style="background-image:url(assets/hsk3.jpg)">
+    <div class="xhero" style="background-image:url(hsk3.jpg)">
       <div class="xhero-in">
         <div class="xcrumb">Khóa học › ${esc(STATE.courseId||'HSK3')} › <b>Bài ${lesNo}</b></div>
         <div class="xhero-t"><h1>${esc(STATE.courseId||'HSK3')} – Bài ${lesNo}: ${esc(zh)}</h1><button class="xplay" id="les-audio">▶</button></div>
@@ -665,7 +665,7 @@ function viewLogin(courseId){
   const tab=STATE.authTab;
   render(`<div class="wrap" style="max-width:560px"><div class="card login-compact">
     <p style="margin:0 0 4px"><button class="linklike" id="back">← Về trang chủ</button></p>
-    <div class="center"><div class="avatar" style="width:52px;height:52px;margin-bottom:6px"><img src="assets/avatar.png" alt=""></div><div><span class="coursebadge">📘 ${esc(courseId)}</span></div></div>
+    <div class="center"><div class="avatar" style="width:52px;height:52px;margin-bottom:6px"><img src="avatar.png" alt=""></div><div><span class="coursebadge">📘 ${esc(courseId)}</span></div></div>
     <h2 class="center" style="margin-top:6px">Vào lớp ${esc(courseId)}</h2>
     <div class="seg" style="margin-top:16px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
     <div id="form" style="margin-top:16px"></div>
@@ -748,7 +748,7 @@ function viewCreateClass(courseId){
 function viewTeacher(tab){
   tab=tab||'dash';
   render(`<div class="wrap"><div class="card">
-    <div class="apphero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="assets/avatar.png" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Bảng điều khiển · ${esc(STATE.courseId||'')} · Lớp ${esc(STATE.codeShort||STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div></div>
+    <div class="apphero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.png" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Bảng điều khiển · ${esc(STATE.courseId||'')} · Lớp ${esc(STATE.codeShort||STATE.code)}</small></span></div><span style="font-size:1.8rem">📊</span></div></div>
     <div class="seg" style="margin-top:16px"><button data-t="dash" class="${tab==='dash'?'on':''}">Học viên</button><button data-t="content" class="${tab==='content'?'on':''}">Nội dung bài</button></div>
     <div id="panel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
     <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
