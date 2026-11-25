@@ -972,44 +972,77 @@ async function tcOverview(body){
   body.innerHTML='<p class="muted">Đang tổng hợp dữ liệu lớp…</p>';
   let data; try{ data=await loadClassRows(); }catch(e){ body.innerHTML='<p class="muted">Lỗi tải dữ liệu. Thử lại.</p>'; return; }
   const {rows,classWeak,WM}=data;
-  if(!rows.length){ body.innerHTML=`<div class="soft" style="padding:34px;text-align:center"><div style="font-size:2rem">👋</div><p class="muted" style="margin-top:8px">Chưa có học viên nào. Gửi mã lớp <b>${esc(STATE.codeShort||STATE.code)}</b> cho học sinh đăng ký — mọi số liệu sẽ <b>tự cập nhật</b> khi các em bắt đầu học.</p></div>`; return; }
-  const n=rows.length, avgAcc=Math.round(rows.reduce((a,r)=>a+r.acc,0)/n), totTime=rows.reduce((a,r)=>a+r.time,0);
   const curr=(typeof ALLWORDS!=='undefined'?ALLWORDS.length:0);
-  const avgProg=curr?Math.round(rows.reduce((a,r)=>a+Math.min(r.learned,curr)/curr,0)/n*100):0;
+  const n=rows.length;
+  const avgAcc=n?Math.round(rows.reduce((a,r)=>a+r.acc,0)/n):0;
+  const totTime=rows.reduce((a,r)=>a+r.time,0);
+  const avgProg=(curr&&n)?Math.round(rows.reduce((a,r)=>a+Math.min(r.learned,curr)/curr,0)/n*100):0;
   const classBk=rows.reduce((o,r)=>({g:o.g+r.bk.g,b:o.b+r.bk.b,a:o.a+r.bk.a,wt:o.wt+r.bk.wt,total:o.total+r.bk.total}),{g:0,b:0,a:0,wt:0,total:0});
-  const hard=Object.keys(classWeak).map(id=>({w:WM[id],n:classWeak[id]})).filter(x=>x.w).sort((a,b)=>b.n-a.n).slice(0,5);
+  const wa={}; rows.forEach(r=>r.cards.forEach(c=>{const x=wa[c.wid]||(wa[c.wid]={cr:0,wr:0});x.cr+=(c.correct||0);x.wr+=(c.wrong||0);}));
+  const hard=Object.keys(classWeak).map(id=>{const a=wa[id]||{cr:0,wr:0};return{w:WM[id],n:classWeak[id],pct:(a.cr+a.wr)?Math.round(a.cr/(a.cr+a.wr)*100):0};}).filter(x=>x.w).sort((a,b)=>b.n-a.n).slice(0,5);
   const br={good:rows.filter(r=>r.acc>=90).length,ok:rows.filter(r=>r.acc>=75&&r.acc<90).length,help:rows.filter(r=>r.acc>=60&&r.acc<75).length,fail:rows.filter(r=>r.acc<60).length};
   const byDate={}; rows.forEach(r=>r.sess.forEach(s=>{const k=s.startedAt?new Date(s.startedAt).toISOString().slice(0,10):null;const rev=s.reviewed||0;if(!k||!rev)return;byDate[k]=byDate[k]||{rev:0,cr:0};byDate[k].rev+=rev;byDate[k].cr+=(s.correct||0);}));
   const linePts=Object.keys(byDate).sort().map(k=>({y:Math.round(byDate[k].cr/byDate[k].rev*100)}));
+  const cm=[];
+  if(!n) cm.push('Chưa có học sinh — gửi mã lớp để các em đăng ký.');
+  else{
+    cm.push(`Lớp có <b>${n}</b> học sinh, độ đúng trung bình <b>${avgAcc}%</b>.`);
+    if(hard.length) cm.push(`Từ cả lớp hay sai: <b>${hard.slice(0,3).map(h=>esc(h.w.hanzi)).join('、')}</b> — nên ôn chung.`);
+    if(br.fail) cm.push(`<b>${br.fail}</b> học viên dưới 60% — cần hỗ trợ thêm.`);
+    if(totTime===0) cm.push('Chưa có hoạt động học — nhắc học sinh bắt đầu luyện.');
+  }
+  const dashed='border:1px dashed #cdd6e4';
   body.innerHTML=`
-   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
-     <div class="stat"><b>${n}</b><span>HỌC SINH</span></div>
-     <div class="stat"><b>${avgAcc}%</b><span>TRẢ LỜI ĐÚNG TB</span></div>
-     <div class="stat"><b>${avgProg}%</b><span>TIẾN ĐỘ GIÁO TRÌNH TB</span></div>
-     <div class="stat"><b>${curr}</b><span>TỪ TRONG GIÁO TRÌNH</span></div>
-     <div class="stat"><b>${fmtDur(totTime)}</b><span>TỔNG THỜI GIAN HỌC</span></div>
-   </div>
-   <div class="grid" style="grid-template-columns:1.25fr 1fr;gap:14px;margin-top:14px">
-     <div class="soft" style="padding:14px;min-width:0"><b>📈 Độ đúng của lớp theo buổi</b>${lineChart(linePts)}</div>
-     <div class="soft" style="padding:14px"><b>🫧 Mức độ nắm vững từ (toàn lớp)</b>
-       <div style="display:flex;gap:16px;align-items:center;margin-top:10px;flex-wrap:wrap">${donutSvg(classBk)}
-       <div style="font-size:.86rem;line-height:2">
-         <div><span class="dotc" style="background:#23b386"></span>Vận dụng tốt <b>${classBk.g}</b></div>
-         <div><span class="dotc" style="background:#2f9fd6"></span>Đã nhận biết <b>${classBk.b}</b></div>
-         <div><span class="dotc" style="background:#f0a500"></span>Chưa vững <b>${classBk.a}</b></div>
-         <div><span class="dotc" style="background:#e5484d"></span>Chưa ghi nhớ <b>${classBk.wt}</b></div>
-       </div></div></div>
-   </div>
-   <div class="grid" style="grid-template-columns:1.25fr 1fr;gap:14px;margin-top:14px">
-     <div class="soft" style="padding:14px"><b>🔥 Top từ cần ôn của lớp</b>${hard.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ</th><th>Pinyin</th><th>Nghĩa</th><th>Số em sai</th></tr></thead><tbody>${hard.map(h=>`<tr><td style="font-size:1.1rem">${esc(h.w.hanzi)}</td><td class="muted">${esc(h.w.pinyin)}</td><td>${esc(h.w.vi)}</td><td><b>${h.n}</b></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ khó nổi bật.</p>'}</div>
-     <div class="soft" style="padding:14px"><b>👥 Phân loại học viên</b><div style="margin-top:10px;font-size:.9rem;line-height:2.2">
-       <div class="spread"><span>🟢 Đạt tốt (≥90%)</span><b>${br.good}</b></div>
-       <div class="spread"><span>🔵 Đạt (75–89%)</span><b>${br.ok}</b></div>
-       <div class="spread"><span>🟠 Cần hỗ trợ (60–74%)</span><b>${br.help}</b></div>
-       <div class="spread"><span>🔴 Chưa đạt (&lt;60%)</span><b>${br.fail}</b></div>
-     </div><p class="center" style="margin-top:10px"><button class="linklike" id="toStu">Xem danh sách chi tiết →</button></p></div>
-   </div>`;
-  const tb=$('#toStu'); if(tb)tb.onclick=()=>viewTeacher('students');
+  ${!n?`<div class="soft" style="padding:14px;margin-bottom:12px"><p class="muted" style="margin:0">👋 Lớp chưa có học sinh. Gửi mã lớp <b>${esc(STATE.codeShort||STATE.code)}</b> để các em đăng ký — <b>mọi số liệu dưới đây sẽ tự cập nhật</b> khi học sinh bắt đầu học.</p></div>`:''}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+    <div class="stat"><b>${n}</b><span>SỐ HỌC SINH</span></div>
+    <div class="stat"><b>${avgProg}%</b><span>TIẾN ĐỘ GIÁO TRÌNH TB</span></div>
+    <div class="stat"><b>${avgAcc}%</b><span>TỶ LỆ TRẢ LỜI ĐÚNG</span></div>
+    <div class="stat"><b>${curr}</b><span>TỪ VỰNG GIÁO TRÌNH</span></div>
+    <div class="stat"><b>${fmtDur(totTime)}</b><span>TỔNG THỜI GIAN HỌC</span></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-top:14px">
+    <div class="soft" style="padding:14px;min-width:0"><b>📈 Tiến độ trung bình của lớp</b>${lineChart(linePts)}</div>
+    <div class="soft" style="padding:14px"><b>🫧 Mức độ nắm vững từ vựng (toàn lớp)</b>
+      <div style="display:flex;gap:16px;align-items:center;margin-top:10px;flex-wrap:wrap">${donutSvg(classBk)}
+      <div style="font-size:.85rem;line-height:2">
+        <div><span class="dotc" style="background:#23b386"></span>Vận dụng tốt <b>${classBk.g}</b></div>
+        <div><span class="dotc" style="background:#2f9fd6"></span>Đã nhận biết <b>${classBk.b}</b></div>
+        <div><span class="dotc" style="background:#f0a500"></span>Chưa vững <b>${classBk.a}</b></div>
+        <div><span class="dotc" style="background:#e5484d"></span>Chưa ghi nhớ <b>${classBk.wt}</b></div>
+      </div></div></div>
+    <div class="soft" style="padding:14px;${dashed}"><div class="spread"><b>🎥 Lớp học trực tuyến (Live)</b><button class="linklike" id="toLive">Xem chi tiết →</button></div>
+      <p class="muted" style="margin-top:10px">Chưa có buổi Live. Khu vực luyện nghe–nói với AI — <b>sắp ra mắt</b> (cần backend AI Speaking Tutor).</p>
+      <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
+        <div class="stat" style="padding:8px"><b>—</b><span>BUỔI LIVE</span></div>
+        <div class="stat" style="padding:8px"><b>—</b><span>TỶ LỆ THAM GIA</span></div>
+      </div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
+    <div class="soft" style="padding:14px"><b>🔥 Top từ vựng cần ôn tập của lớp</b>${hard.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ</th><th>Nghĩa</th><th>% đúng</th><th>Số em sai</th></tr></thead><tbody>${hard.map(h=>`<tr><td style="font-size:1.05rem">${esc(h.w.hanzi)}</td><td>${esc(h.w.vi)}</td><td>${h.pct}%</td><td><b>${h.n}</b></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ khó nổi bật.</p>'}</div>
+    <div class="soft" style="padding:14px"><b>✨ Nhận xét & đề xuất</b><ul style="margin:8px 0 0;padding-left:18px;line-height:1.8;font-size:.9rem">${cm.map(c=>`<li>${c}</li>`).join('')}</ul><p class="muted" style="margin-top:8px;font-size:.76rem">*Tổng hợp tự động từ dữ liệu. Nhận xét bằng AI sẽ bổ sung sau.</p></div>
+    <div class="soft" style="padding:14px"><div class="spread"><b>👥 Quản lý học viên</b><button class="linklike" id="toStu2">Chi tiết →</button></div><div style="margin-top:10px;font-size:.9rem;line-height:2.2">
+      <div class="spread"><span>🟢 Đạt tốt (≥90%)</span><b>${br.good}</b></div>
+      <div class="spread"><span>🔵 Đạt (75–89%)</span><b>${br.ok}</b></div>
+      <div class="spread"><span>🟠 Cần hỗ trợ (60–74%)</span><b>${br.help}</b></div>
+      <div class="spread"><span>🔴 Chưa đạt (&lt;60%)</span><b>${br.fail}</b></div>
+    </div></div>
+    <div class="soft" style="padding:14px"><div class="spread"><b>📖 Phân tích từ vựng</b><button class="linklike" id="toVocab">Chi tiết →</button></div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap">${donutSvg(classBk)}
+      <div style="font-size:.84rem;line-height:1.95">
+        <div>Tổng số từ <b>${curr}</b></div>
+        <div><span class="dotc" style="background:#23b386"></span>Vận dụng tốt <b>${classBk.g}</b></div>
+        <div><span class="dotc" style="background:#f0a500"></span>Chưa vững <b>${classBk.a}</b></div>
+        <div><span class="dotc" style="background:#e5484d"></span>Cần ôn <b>${classBk.wt}</b></div>
+      </div></div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
+    <div class="soft" style="padding:14px;${dashed}"><div class="spread"><b>📋 Báo cáo buổi học (tổng hợp)</b><button class="linklike" id="toReport">→</button></div><p class="muted" style="margin-top:10px">Báo cáo mỗi buổi Live (tỷ lệ đúng, vận dụng từ, nhận xét) — hiện khi có buổi Live.</p></div>
+    <div class="soft" style="padding:14px;${dashed}"><div class="spread"><b>📝 Kiểm tra & đánh giá</b><button class="linklike" id="toTests">→</button></div><p class="muted" style="margin-top:10px">Chưa có bài kiểm tra. Tạo bài kiểm tra & ngân hàng câu hỏi — giai đoạn sau.</p></div>
+    <div class="soft" style="padding:14px"><div class="spread"><b>📈 Phân tích tiến bộ</b><button class="linklike" id="toProg">→</button></div>${linePts.length>=2?lineChart(linePts):'<p class="muted" style="margin-top:10px">Cần ≥2 buổi học để thấy xu hướng tiến bộ.</p>'}</div>
+  </div>`;
+  const on=(id,s)=>{const b=$(id);if(b)b.onclick=()=>viewTeacher(s);};
+  on('#toLive','live');on('#toStu2','students');on('#toVocab','vocab');on('#toReport','report');on('#toTests','tests');on('#toProg','progress');
 }
 async function tcVocab(body){
   body.innerHTML='<p class="muted">Đang phân tích từ vựng…</p>';
