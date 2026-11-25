@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isOwner() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && myRole() == 'owner';
+    }
+
+    // ---- Tài khoản ----
+    match /users/{uid} {
+      allow read:   if request.auth.uid == uid || isOwner();
+      allow create: if request.auth.uid == uid
+                      && request.resource.data.role in ['student','teacher'];
+      allow update: if isOwner()
+                      || (request.auth.uid == uid
+                          && request.resource.data.role == resource.data.role);
+      allow delete: if isOwner();
+    }
+
+    // ---- Lớp học ----
+    match /classes/{code} {
+      allow read:   if true;   // cho phép kiểm tra mã lớp khi đăng ký
+      allow create: if signedIn()
+                      && request.resource.data.teacherUid == request.auth.uid;
+      allow update, delete: if isOwner()
+                      || (signedIn() && resource.data.teacherUid == request.auth.uid);
+
+      function isClassTeacher() {
+        return signedIn()
+          && get(/databases/$(database)/documents/classes/$(code)).data.teacherUid == request.auth.uid;
+      }
+
+      // Dữ liệu học tập của học viên (keyed theo uid)
+      match /students/{uid} {
+        allow read, create, update:
+          if request.auth.uid == uid || isClassTeacher() || isOwner();
+        allow delete: if isClassTeacher() || isOwner();
+
+        match /{sub=**} {
+          allow read, write:
+            if request.auth.uid == uid || isClassTeacher() || isOwner();
+        }
+      }
+
+      // Danh sách bị cấm vào lớp
+      match /banned/{uid} {
+        allow read:  if signedIn();
+        allow write: if isClassTeacher() || isOwner();
+      }
+    }
+  }
+}

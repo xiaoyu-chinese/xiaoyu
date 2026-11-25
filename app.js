@@ -695,6 +695,7 @@ async function enterStudent(us){
   if(!us.classId) return viewJoinClass();
   const cls=await clsRef(us.classId).get();
   if(!cls.exists) return viewJoinClass('Lớp cũ không còn — nhập lại mã lớp mới nhé.');
+  try{ const bn=await clsRef(us.classId).collection('banned').doc(auth.currentUser.uid).get(); if(bn.exists){ try{ await userRef(auth.currentUser.uid).update({classId:''}); }catch(e){} STATE.me.classId=''; return viewJoinClass('Bạn không còn trong lớp này. Liên hệ giáo viên nếu cần.'); } }catch(e){}
   const d=cls.data();
   STATE.code=us.classId; STATE.codeShort=d.code; STATE.courseId=d.level; STATE.cls=d; STATE.teacher=d.teacherName; STATE.sid=auth.currentUser.uid; STATE.role='student';
   const ref=stuRef(STATE.code,STATE.sid); const ss=await ref.get();
@@ -789,6 +790,7 @@ function viewJoinClass(msg){
   $('#go').onclick=async()=>{
     const code=($('#code').value||'').trim().toUpperCase(); if(!code) return toast('Nhập mã lớp');
     const cls=await clsRef(code).get(); if(!cls.exists) return toast('Mã lớp không đúng');
+    const bn=await clsRef(code).collection('banned').doc(auth.currentUser.uid).get(); if(bn.exists) return toast('Bạn bị cấm vào lớp này');
     await userRef(auth.currentUser.uid).update({classId:code});
     STATE.me.classId=code; await enterStudent(STATE.me);
   };
@@ -902,11 +904,38 @@ async function teacherDash(){
     <div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>HỌC VIÊN</span></div><div class="stat"><b>${avgAcc}%</b><span>ĐÚNG TB</span></div><div class="stat"><b>${rows.reduce((n,r)=>n+r.mastered,0)}</b><span>TỪ THUỘC</span></div></div>
     <div class="row" style="margin:14px 0"><button class="btn sm" id="csv">⬇️ Xuất CSV</button></div>
     <div class="tbl-wrap"><table><thead><tr><th>Tên</th><th>Email</th><th>🔥</th><th>Đã học</th><th>Thuộc</th><th>Từ yếu</th><th>Buổi</th><th>Đúng</th><th></th></tr></thead><tbody>`;
-  rows.forEach(r=>html+=`<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.email)}</td><td>${r.streak}</td><td>${r.learned}</td><td>${r.mastered}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${r.acc}%</td><td><button class="btn sm reset" data-email="${esc(r.email)}">Cấp lại MK</button></td></tr>`);
-  html+='</tbody></table></div>'; panel.innerHTML=html;
+  rows.forEach(r=>html+=`<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.email)}</td><td>${r.streak}</td><td>${r.learned}</td><td>${r.mastered}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${r.acc}%</td><td style="white-space:nowrap"><button class="btn sm reset" data-email="${esc(r.email)}">Cấp lại MK</button> <button class="btn sm kick" data-uid="${esc(r.uid)}" data-name="${esc(r.name)}" data-email="${esc(r.email)}" style="background:#e5484d;color:#fff">🚫 Xóa</button></td></tr>`);
+  html+='</tbody></table></div><div id="banbox" style="margin-top:14px"></div>'; panel.innerHTML=html;
   const bk=$('#bk'); if(bk) bk.onclick=viewTeacherHome;
   $('#csv').onclick=()=>exportCSV(rows);
   panel.querySelectorAll('.reset').forEach(b=>b.onclick=async()=>{const em=b.dataset.email;if(!em)return toast('Học viên này chưa có email');try{await auth.sendPasswordResetEmail(em);toast('Đã gửi mail đặt lại cho '+em);}catch(e){toast(authErr(e));}});
+  panel.querySelectorAll('.kick').forEach(b=>b.onclick=async()=>{
+    const uid=b.dataset.uid, nm=b.dataset.name||'học viên này', em=b.dataset.email||'';
+    if(!confirm('Xóa & cấm '+nm+' khỏi lớp?\nBạn này sẽ không vào lại được (có thể Bỏ cấm sau).')) return;
+    b.disabled=true;
+    try{ await removeAndBan(STATE.code, uid, em, nm); toast('Đã xóa & cấm '+nm); teacherDash(); }
+    catch(e){ b.disabled=false; toast(authErr(e)); }
+  });
+  await renderBanned();
+}
+async function removeAndBan(code, uid, email, name){
+  const batch=db.batch();
+  (await cardsCol(code,uid).get()).docs.forEach(d=>batch.delete(d.ref));
+  (await sessCol(code,uid).get()).docs.forEach(d=>batch.delete(d.ref));
+  batch.delete(stuRef(code,uid));
+  batch.set(clsRef(code).collection('banned').doc(uid), {email:email||'',name:name||'',bannedAt:now()});
+  await batch.commit();
+}
+async function renderBanned(){
+  const box=$('#banbox'); if(!box) return;
+  try{
+    const q=await clsRef(STATE.code).collection('banned').get();
+    if(q.empty){ box.innerHTML=''; return; }
+    let h=`<div class="soft" style="padding:12px"><b>🚫 Danh sách bị cấm (${q.size})</b><div class="tbl-wrap" style="margin-top:8px"><table><tbody>`;
+    q.docs.forEach(d=>{const b=d.data();h+=`<tr><td>${esc(b.name||'')}</td><td class="muted">${esc(b.email||'')}</td><td><button class="btn sm unban" data-uid="${esc(d.id)}">Bỏ cấm</button></td></tr>`;});
+    h+='</tbody></table></div></div>'; box.innerHTML=h;
+    box.querySelectorAll('.unban').forEach(b=>b.onclick=async()=>{try{await clsRef(STATE.code).collection('banned').doc(b.dataset.uid).delete();toast('Đã bỏ cấm');renderBanned();}catch(e){toast(authErr(e));}});
+  }catch(e){ box.innerHTML=''; }
 }
 function exportCSV(rows){
   let lines=[['Tên','Chuỗi','Đã học','Thuộc','Từ yếu','Số buổi','Tổng giây','% đúng'].join(',')];
