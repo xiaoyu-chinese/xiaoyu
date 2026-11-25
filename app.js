@@ -7,9 +7,9 @@ const firebaseConfig = {
   messagingSenderId: "333044970276",
   appId: "1:333044970276:web:356bb1af3eda4649eb79b1"
 };
-let db=null, FB_OK=false;
+let db=null, auth=null, FB_OK=false;
 try{ if(firebaseConfig.apiKey && firebaseConfig.apiKey!=="DAN_VAO_DAY"){
-  firebase.initializeApp(firebaseConfig); db=firebase.firestore(); FB_OK=true; } }catch(e){ console.warn(e); }
+  firebase.initializeApp(firebaseConfig); db=firebase.firestore(); auth=firebase.auth(); FB_OK=true; } }catch(e){ console.warn(e); }
 
 /* ---- tiện ích ---- */
 const root=document.getElementById('app');
@@ -658,90 +658,218 @@ const ZALO='https://zalo.me/0368280988';
 const soon=()=>toast('🚧 Mục này sắp ra mắt nha');
 
 function viewLanding(){ showLanding(); }
-function pickCourse(id){ const c=COURSES.find(x=>x.id===id); if(!c)return; if(!c.ready) return toast('🚧 '+id+' sắp ra mắt nha'); if(!FB_OK) return toast('Chưa kết nối máy chủ, thử lại sau'); viewLogin(id); }
+function pickCourse(id){ const c=COURSES.find(x=>x.id===id); if(!c)return; if(!c.ready) return toast('🚧 '+id+' sắp ra mắt nha'); if(!FB_OK) return toast('Chưa kết nối máy chủ, thử lại sau'); STATE.courseId=id; STATE.authMode='login'; if(auth&&auth.currentUser){ return routeByRole(); } viewLogin(id); }
 
-function viewLogin(courseId){
-  STATE.courseId=courseId; STATE.authTab=STATE.authTab||'student';
-  const tab=STATE.authTab;
-  render(`<div class="wrap" style="max-width:560px"><div class="card login-compact">
+/* ================= AUTH (Firebase Authentication) ================= */
+const usersCol=()=>db.collection('users');
+const userRef=u=>usersCol().doc(u);
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genCode(level){
+  const pre=(level||'HSK0').replace(/[^0-9]/g,'')||'0';
+  let r=''; for(let i=0;i<5;i++) r+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+  return 'H'+pre+'-'+r;
+}
+function authErr(e){
+  const c=(e&&e.code)||'';
+  if(c.includes('email-already-in-use')) return 'Email này đã đăng ký — thử Đăng nhập';
+  if(c.includes('invalid-email')) return 'Email không hợp lệ';
+  if(c.includes('weak-password')) return 'Mật khẩu quá yếu (cần ≥ 6 ký tự)';
+  if(c.includes('wrong-password')||c.includes('invalid-credential')||c.includes('invalid-login')) return 'Sai email hoặc mật khẩu';
+  if(c.includes('user-not-found')) return 'Chưa có tài khoản này — thử Đăng ký';
+  if(c.includes('user-disabled')) return 'Tài khoản đã bị khóa';
+  if(c.includes('too-many-requests')) return 'Thử lại sau ít phút nhé';
+  if(c.includes('network')) return 'Lỗi mạng — kiểm tra kết nối (VPN?)';
+  console.error(e); return 'Có lỗi, thử lại';
+}
+async function routeByRole(){
+  const u=auth.currentUser; if(!u) return viewLogin(STATE.courseId);
+  let us; try{ us=(await userRef(u.uid).get()).data(); }catch(e){ return toast(authErr(e)); }
+  if(!us){ us={email:u.email,name:u.displayName||'',role:'student',createdAt:now()}; try{ await userRef(u.uid).set(us); }catch(e){} }
+  try{ await userRef(u.uid).update({lastActive:now()}); }catch(e){}
+  STATE.me=us; STATE.uid=u.uid;
+  if(us.role==='owner') return viewOwner();
+  if(us.role==='teacher') return viewTeacherHome();
+  return enterStudent(us);
+}
+async function enterStudent(us){
+  if(!us.classId) return viewJoinClass();
+  const cls=await clsRef(us.classId).get();
+  if(!cls.exists) return viewJoinClass('Lớp cũ không còn — nhập lại mã lớp mới nhé.');
+  const d=cls.data();
+  STATE.code=us.classId; STATE.codeShort=d.code; STATE.courseId=d.level; STATE.cls=d; STATE.teacher=d.teacherName; STATE.sid=auth.currentUser.uid; STATE.role='student';
+  const ref=stuRef(STATE.code,STATE.sid); const ss=await ref.get();
+  if(!ss.exists) await ref.set({name:us.name||'',email:us.email||'',createdAt:now(),streak:0,lastDay:'',days:[]});
+  await loadMe(); await loadCards(); DASH=null; ROUTE='lessons'; pageLesson();
+}
+function authShell(courseId,title,body){
+  render(`<div class="wrap" style="max-width:520px"><div class="card login-compact">
     <p style="margin:0 0 4px"><button class="linklike" id="back">← Về trang chủ</button></p>
-    <div class="center"><div class="avatar" style="width:52px;height:52px;margin-bottom:6px"><img src="avatar.png" alt=""></div><div><span class="coursebadge">📘 ${esc(courseId)}</span></div></div>
-    <h2 class="center" style="margin-top:6px">Vào lớp ${esc(courseId)}</h2>
-    <div class="seg" style="margin-top:16px"><button data-tab="student" class="${tab==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-tab="teacher" class="${tab==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
-    <div id="form" style="margin-top:16px"></div>
+    <div class="center"><div class="avatar" style="width:52px;height:52px;margin-bottom:6px"><img src="avatar.png" alt=""></div><div><span class="coursebadge">📘 ${esc(courseId||'XiaoYu')}</span></div></div>
+    <h2 class="center" style="margin-top:6px">${title}</h2>
+    <div id="form" style="margin-top:16px">${body}</div>
   </div></div>`);
   $('#back').onclick=viewLanding;
-  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{STATE.authTab=b.dataset.tab;viewLogin(courseId);});
-  const f=$('#form');
-  if(tab==='student'){
-    f.innerHTML=`
-      <div class="field ico"><label>Mã lớp</label><span class="ic">🎫</span><input id="code" placeholder="VD: A1" autocapitalize="characters" value="${esc(lsGet('lastCode',''))}"></div>
-      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
-      <div class="field ico"><label>Tên của bạn</label><span class="ic">🙂</span><input id="name" placeholder="VD: Minh Anh"></div>
-      <div class="field ico"><label>Mã PIN (4 số, tự đặt)</label><span class="ic">🔒</span><input id="pin" inputmode="numeric" placeholder="VD: 1234"></div>
-      <button class="btn block" id="go">Vào học 🚀</button>
-      <p class="muted" style="margin-top:10px;font-size:.84rem">Nhập đúng mã lớp + tên cô của lớp bạn. Lần đầu nhập tên + PIN để tạo tài khoản; lần sau dùng lại đúng tên + PIN.</p>`;
-    $('#go').onclick=async()=>{
-      const code=$('#code').value.trim().toUpperCase(), tn=$('#tname').value.trim(), name=$('#name').value.trim(), pin=$('#pin').value.trim();
-      if(!code||!tn||!name||!pin) return toast('Điền đủ thông tin nha');
-      const cid=mkCid(courseId,slug(tn),code);
-      try{
-        const snap=await clsRef(cid).get();
-        if(!snap.exists) return toast('Chưa có lớp này — kiểm tra lại mã lớp & tên cô');
-        STATE.code=cid; STATE.codeShort=code; STATE.cls=snap.data(); STATE.teacher=snap.data().teacher||tn;
-        lsSet('lastCode',code); lsSet('lastTeacher',tn);
-        const sid=slug(name)+'_'+pin; const ref=stuRef(cid,sid); const ss=await ref.get();
-        if(!ss.exists) await ref.set({name,pin,createdAt:now(),streak:0,lastDay:'',days:[]});
-        else if(ss.data().pin!==pin) return toast('Sai PIN rồi nha');
-        STATE.sid=sid; STATE.role='student';
-        await loadMe(); await loadCards(); DASH=null; ROUTE='lessons'; pageLesson();
-      }catch(e){ console.error(e); toast('Lỗi kết nối, thử lại'); }
-    };
+}
+function viewLogin(courseId){
+  courseId=courseId||STATE.courseId||'HSK3'; STATE.courseId=courseId;
+  STATE.authMode=STATE.authMode||'login';
+  const mode=STATE.authMode;
+  const seg=`<div class="seg" style="margin-bottom:16px"><button data-m="login" class="${mode==='login'?'on':''}">Đăng nhập</button><button data-m="signup" class="${mode==='signup'?'on':''}">Đăng ký</button></div>`;
+  let body;
+  if(mode==='login'){
+    body=seg+`
+      <div class="field ico"><label>Email</label><span class="ic">✉️</span><input id="email" type="email" autocomplete="email" placeholder="email@..." value="${esc(lsGet('lastEmail',''))}"></div>
+      <div class="field ico"><label>Mật khẩu</label><span class="ic">🔑</span><input id="pw" type="password" autocomplete="current-password" placeholder="mật khẩu"></div>
+      <button class="btn block" id="go">Đăng nhập</button>
+      <p class="center" style="margin-top:10px"><button class="linklike" id="forgot">Quên mật khẩu?</button></p>`;
   }else{
-    f.innerHTML=`
-      <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tname" placeholder="VD: Cô Ngọ" value="${esc(lsGet('lastTeacher',''))}"></div>
-      <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="pw" placeholder="mật khẩu"></div>
-      <button class="btn block" id="go">Vào bảng điều khiển</button>
-      <p class="muted" style="margin-top:10px">Chưa có lớp? <button class="linklike" id="mk">Tạo lớp mới</button></p>`;
-    $('#mk').onclick=()=>viewCreateClass(courseId);
-    $('#go').onclick=async()=>{
-      const tn=$('#tname').value.trim(), pw=$('#pw').value.trim(); if(!tn||!pw) return toast('Điền tên + mật khẩu');
-      try{
-        const q=await db.collection('classes').where('level','==',courseId).where('teacherSlug','==',slug(tn)).where('pin','==',pw).get();
-        if(q.empty) return toast('Sai tên giáo viên hoặc mật khẩu');
-        lsSet('lastTeacher',tn);
-        if(q.docs.length===1){ enterTeacher(q.docs[0]); }
-        else{
-          render(`<div class="wrap"><div class="card"><h2>Chọn lớp để quản lý</h2><div class="grid" style="margin-top:12px" id="pick"></div>
-            <p class="center" style="margin-top:12px"><button class="linklike" id="b">← Quay lại</button></p></div></div>`);
-          $('#b').onclick=()=>viewLogin(courseId);
-          const pk=$('#pick'); q.docs.forEach(d=>{const b=document.createElement('button');b.className='listbtn';b.innerHTML=`<div class="spread"><b>Lớp ${esc(d.data().code)}</b><span class="pill">${esc(d.data().level)}</span></div>`;b.onclick=()=>enterTeacher(d);pk.appendChild(b);});
-        }
-      }catch(e){ console.error(e); toast('Lỗi kết nối'); }
-    };
+    const r=STATE.signupRole||'student';
+    body=seg+`
+      <div class="seg" style="margin-bottom:12px"><button data-r="student" class="${r==='student'?'on':''}">🧑‍🎓 Học viên</button><button data-r="teacher" class="${r==='teacher'?'on':''}">👩‍🏫 Giáo viên</button></div>
+      <div class="field ico"><label>Họ tên</label><span class="ic">🙂</span><input id="name" placeholder="VD: Minh Anh"></div>
+      <div class="field ico"><label>Email</label><span class="ic">✉️</span><input id="email" type="email" autocomplete="email" placeholder="email@..."></div>
+      <div class="field ico"><label>Mật khẩu (≥ 6 ký tự)</label><span class="ic">🔑</span><input id="pw" type="password" autocomplete="new-password" placeholder="mật khẩu"></div>
+      ${r==='student'?`<div class="field ico"><label>Mã lớp (cô cấp)</label><span class="ic">🎫</span><input id="code" placeholder="VD: H3-ABC12" autocapitalize="characters"></div>`:''}
+      <button class="btn block" id="go">Đăng ký</button>`;
+  }
+  authShell(courseId, (mode==='login'?'Đăng nhập':'Đăng ký')+' · '+esc(courseId), body);
+  root.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{STATE.authMode=b.dataset.m;viewLogin(courseId);});
+  root.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{STATE.signupRole=b.dataset.r;viewLogin(courseId);});
+  if(mode==='login'){
+    $('#go').onclick=doLogin; $('#forgot').onclick=doForgot;
+    $('#pw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
+  }else{
+    $('#go').onclick=doSignup;
   }
 }
-function enterTeacher(doc){ const d=doc.data(); STATE.code=doc.id; STATE.codeShort=d.code; STATE.courseId=d.level; STATE.cls=d; STATE.teacher=d.teacher; STATE.role='teacher'; viewTeacher(); }
+async function doLogin(){
+  const email=($('#email').value||'').trim(), pw=$('#pw').value||'';
+  if(!email||!pw) return toast('Nhập email + mật khẩu nha');
+  const btn=$('#go'); btn.disabled=true; btn.textContent='Đang vào…';
+  try{ await auth.signInWithEmailAndPassword(email,pw); lsSet('lastEmail',email); await routeByRole(); }
+  catch(e){ btn.disabled=false; btn.textContent='Đăng nhập'; toast(authErr(e)); }
+}
+async function doSignup(){
+  const role=STATE.signupRole||'student';
+  const name=($('#name').value||'').trim(), email=($('#email').value||'').trim(), pw=$('#pw').value||'';
+  if(!name||!email||!pw) return toast('Điền đủ họ tên, email, mật khẩu');
+  if(pw.length<6) return toast('Mật khẩu cần từ 6 ký tự');
+  let code='';
+  if(role==='student'){
+    code=($('#code').value||'').trim().toUpperCase(); if(!code) return toast('Nhập mã lớp cô cấp');
+    const cls=await clsRef(code).get(); if(!cls.exists) return toast('Mã lớp không đúng — hỏi lại cô nhé');
+  }
+  const btn=$('#go'); btn.disabled=true; btn.textContent='Đang tạo…';
+  try{
+    const cred=await auth.createUserWithEmailAndPassword(email,pw);
+    const uid=cred.user.uid;
+    const doc={email,name,role,createdAt:now(),lastActive:now()};
+    if(role==='student') doc.classId=code;
+    await userRef(uid).set(doc);
+    try{ await cred.user.updateProfile({displayName:name}); }catch(e){}
+    lsSet('lastEmail',email);
+    await routeByRole();
+    toast('Tạo tài khoản thành công 🎉');
+  }catch(e){ btn.disabled=false; btn.textContent='Đăng ký'; toast(authErr(e)); }
+}
+async function doForgot(){
+  const email=(($('#email')&&$('#email').value)||'').trim();
+  const to=email||prompt('Nhập email để nhận link đặt lại mật khẩu:');
+  if(!to) return;
+  try{ await auth.sendPasswordResetEmail(to); toast('Đã gửi mail đặt lại mật khẩu — kiểm tra hộp thư (cả Spam) nhé'); }
+  catch(e){ toast(authErr(e)); }
+}
+function viewJoinClass(msg){
+  authShell(STATE.courseId,'Vào lớp', `
+    ${msg?`<p class="muted" style="margin-bottom:10px">${esc(msg)}</p>`:''}
+    <div class="field ico"><label>Mã lớp (cô cấp)</label><span class="ic">🎫</span><input id="code" placeholder="VD: H3-ABC12" autocapitalize="characters"></div>
+    <button class="btn block" id="go">Vào lớp</button>
+    <p class="center muted" style="margin-top:10px"><button class="linklike" id="out">Đăng xuất</button></p>`);
+  $('#out').onclick=doLogout;
+  $('#go').onclick=async()=>{
+    const code=($('#code').value||'').trim().toUpperCase(); if(!code) return toast('Nhập mã lớp');
+    const cls=await clsRef(code).get(); if(!cls.exists) return toast('Mã lớp không đúng');
+    await userRef(auth.currentUser.uid).update({classId:code});
+    STATE.me.classId=code; await enterStudent(STATE.me);
+  };
+}
+async function doLogout(){ try{ await auth.signOut(); }catch(e){} STATE.role=null; STATE.me=null; STATE.code=null; STATE.sid=null; viewLanding(); }
 
+/* ====== GIÁO VIÊN: chọn / tạo lớp ====== */
+async function viewTeacherHome(){
+  render(`<div class="wrap"><div class="card">
+    <div class="apphero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.png" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu Class</b><small style="display:block;color:var(--muted);font-weight:700">Giáo viên · ${esc((STATE.me&&STATE.me.name)||'')}</small></span></div><span style="font-size:1.8rem">👩‍🏫</span></div></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="mk">+ Tạo lớp mới</button></div>
+    <div id="list" style="margin-top:14px"><p class="muted">Đang tải lớp…</p></div>
+    <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
+  $('#out').onclick=doLogout; $('#mk').onclick=()=>viewCreateClass(STATE.courseId);
+  const list=$('#list');
+  try{
+    const q=await db.collection('classes').where('teacherUid','==',auth.currentUser.uid).get();
+    if(q.empty){ list.innerHTML=`<div class="soft" style="padding:16px">Cô chưa có lớp nào. Bấm <b>+ Tạo lớp mới</b> — hệ thống sẽ cấp <b>mã lớp</b> để gửi cho học viên.</div>`; return; }
+    list.innerHTML='';
+    q.docs.forEach(dd=>{const c=dd.data();const b=document.createElement('button');b.className='listbtn';b.innerHTML=`<div class="spread"><b>Lớp ${esc(c.code)}</b><span class="pill">${esc(c.level)}</span></div>`;b.onclick=()=>{STATE.code=dd.id;STATE.codeShort=c.code;STATE.courseId=c.level;STATE.cls=c;STATE.teacher=c.teacherName;STATE.role='teacher';viewTeacher();};list.appendChild(b);});
+  }catch(e){ list.innerHTML='<p class="muted">'+esc(authErr(e))+'</p>'; }
+}
 function viewCreateClass(courseId){
   courseId=courseId||STATE.courseId||'HSK3';
-  render(`<div class="wrap"><div class="card"><h2>Tạo lớp mới · ${esc(courseId)}</h2><p class="muted">Dành cho giáo viên.</p>
+  render(`<div class="wrap"><div class="card"><h2>Tạo lớp mới</h2>
+    <p class="muted">Hệ thống sẽ tự cấp <b>mã lớp</b> để cô gửi cho học viên.</p>
     <div style="margin-top:14px">
-    <div class="field ico"><label>Tên giáo viên</label><span class="ic">👩‍🏫</span><input id="tn" placeholder="VD: Cô Ngọ"></div>
-    <div class="field ico"><label>Mã lớp (học viên sẽ nhập)</label><span class="ic">🎫</span><input id="c" placeholder="VD: A1" autocapitalize="characters"></div>
-    <div class="field ico"><label>Mật khẩu giáo viên</label><span class="ic">🔑</span><input id="p" placeholder="VD: 2468"></div>
-    <button class="btn block" id="save">Tạo lớp</button>
+    <div class="field ico"><label>Trình độ</label><span class="ic">📘</span>
+      <select id="lvl">${COURSES.map(c=>`<option value="${c.id}" ${c.id===courseId?'selected':''}>${c.id}</option>`).join('')}</select></div>
+    <button class="btn block" id="save">Tạo lớp &amp; cấp mã</button>
     <p class="center" style="margin-top:12px"><button class="linklike" id="back">← Quay lại</button></p></div></div></div>`);
-  $('#back').onclick=()=>viewLogin(courseId);
+  $('#back').onclick=viewTeacherHome;
   $('#save').onclick=async()=>{
-    const tn=$('#tn').value.trim(), c=$('#c').value.trim().toUpperCase(), p=$('#p').value.trim();
-    if(!tn||!c||!p) return toast('Điền đủ tên cô + mã lớp + mật khẩu');
-    const cid=mkCid(courseId,slug(tn),c);
-    const ex=await clsRef(cid).get(); if(ex.exists) return toast('Lớp này (cô + mã) đã tồn tại');
-    const data={level:courseId,teacher:tn,teacherSlug:slug(tn),code:c,pin:p,createdAt:now()};
-    await clsRef(cid).set(data);
-    toast('Đã tạo lớp 🎉'); STATE.code=cid; STATE.codeShort=c; STATE.courseId=courseId; STATE.cls=data; STATE.teacher=tn; STATE.role='teacher'; viewTeacher();
+    const lvl=$('#lvl').value||courseId;
+    const btn=$('#save'); btn.disabled=true; btn.textContent='Đang tạo…';
+    try{
+      let code, tries=0; do{ code=genCode(lvl); tries++; }while((await clsRef(code).get()).exists && tries<8);
+      const data={code,level:lvl,teacherUid:auth.currentUser.uid,teacherName:(STATE.me&&STATE.me.name)||'',createdAt:now()};
+      await clsRef(code).set(data);
+      STATE.code=code; STATE.codeShort=code; STATE.courseId=lvl; STATE.cls=data; STATE.teacher=data.teacherName; STATE.role='teacher';
+      toast('Đã tạo lớp 🎉 Mã: '+code); viewTeacher();
+    }catch(e){ btn.disabled=false; btn.textContent='Tạo lớp & cấp mã'; toast(authErr(e)); }
   };
+}
+
+/* ================= CHỦ (OWNER) ================= */
+async function viewOwner(){
+  render(`<div class="wrap"><div class="card">
+    <div class="apphero"><div class="spread"><div class="brand"><span class="mark" style="width:46px;height:46px"><img src="avatar.png" alt=""></span><span><b style="font-family:'Baloo 2';font-size:1.1rem">XiaoYu · Quản trị</b><small style="display:block;color:var(--muted);font-weight:700">Tài khoản chủ</small></span></div><span style="font-size:1.8rem">🛡️</span></div></div>
+    <div class="seg" style="margin-top:16px"><button data-o="users" class="on">Tài khoản</button><button data-o="classes">Lớp học</button></div>
+    <div id="opanel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
+    <p class="center muted" style="margin-top:8px"><button class="linklike" id="teach">👩‍🏫 Chế độ giáo viên</button> &nbsp;·&nbsp; <button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
+  $('#out').onclick=doLogout; $('#teach').onclick=viewTeacherHome;
+  root.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{root.querySelectorAll('[data-o]').forEach(x=>x.classList.remove('on'));b.classList.add('on'); b.dataset.o==='users'?ownerUsers():ownerClasses();});
+  ownerUsers();
+}
+async function ownerUsers(){
+  const p=$('#opanel'); p.innerHTML='<p class="muted">Đang tải tài khoản…</p>';
+  try{
+    const q=await usersCol().get();
+    const rows=q.docs.map(d=>({uid:d.id,...d.data()}));
+    const roleName={owner:'Chủ',teacher:'Giáo viên',student:'Học viên'};
+    let html=`<div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>TÀI KHOẢN</span></div><div class="stat"><b>${rows.filter(r=>r.role==='teacher').length}</b><span>GIÁO VIÊN</span></div><div class="stat"><b>${rows.filter(r=>r.role==='student').length}</b><span>HỌC VIÊN</span></div></div>
+      <div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Email</th><th>Tên</th><th>Vai trò</th><th>Lớp</th><th>Hoạt động</th><th></th></tr></thead><tbody>`;
+    rows.sort((a,b)=>(b.lastActive||0)-(a.lastActive||0)).forEach(r=>{
+      html+=`<tr><td>${esc(r.email||'')}</td><td>${esc(r.name||'')}</td><td>${esc(roleName[r.role]||r.role||'')}</td><td>${esc(r.classId||'—')}</td><td class="muted">${r.lastActive?new Date(r.lastActive).toISOString().slice(0,10):'—'}</td><td><button class="btn sm reset" data-email="${esc(r.email||'')}">Reset MK</button></td></tr>`;
+    });
+    html+='</tbody></table></div><p class="muted" style="margin-top:8px">Mật khẩu được mã hóa — không hiển thị được. Dùng <b>Reset MK</b> để gửi mail đặt lại cho tài khoản.</p>';
+    p.innerHTML=html;
+    p.querySelectorAll('.reset').forEach(b=>b.onclick=async()=>{const em=b.dataset.email;if(!em)return;try{await auth.sendPasswordResetEmail(em);toast('Đã gửi mail đặt lại cho '+em);}catch(e){toast(authErr(e));}});
+  }catch(e){ p.innerHTML='<p class="muted">Lỗi tải tài khoản — kiểm tra Security Rules đã cho owner đọc <b>users</b> chưa.</p>'; }
+}
+async function ownerClasses(){
+  const p=$('#opanel'); p.innerHTML='<p class="muted">Đang tải lớp…</p>';
+  try{
+    const q=await db.collection('classes').get();
+    if(q.empty){ p.innerHTML='<p class="muted">Chưa có lớp nào.</p>'; return; }
+    let html=`<div class="tbl-wrap"><table><thead><tr><th>Mã lớp</th><th>Trình độ</th><th>Giáo viên</th><th>Tạo ngày</th></tr></thead><tbody>`;
+    q.docs.forEach(d=>{const c=d.data();html+=`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.level)}</td><td>${esc(c.teacherName||'')}</td><td class="muted">${c.createdAt?new Date(c.createdAt).toISOString().slice(0,10):'—'}</td></tr>`;});
+    html+='</tbody></table></div>'; p.innerHTML=html;
+  }catch(e){ p.innerHTML='<p class="muted">Lỗi tải lớp.</p>'; }
 }
 
 /* ================= GIÁO VIÊN ================= */
@@ -753,12 +881,14 @@ function viewTeacher(tab){
     <div id="panel" style="margin-top:14px"><p class="muted">Đang tải…</p></div>
     <p class="center muted" style="margin-top:8px"><button class="linklike" id="out">Đăng xuất</button></p></div></div>`);
   root.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>viewTeacher(b.dataset.t));
-  $('#out').onclick=()=>{STATE.role=null;viewLanding();};
+  $('#out').onclick=doLogout;
   tab==='dash'?teacherDash():teacherContent();
 }
 async function teacherDash(){
   const panel=$('#panel'); const stus=await stuCol(STATE.code).get();
-  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào đăng nhập.<br>Chia sẻ mã lớp <b>${esc(STATE.codeShort||STATE.code)}</b> + tên cô cho các em nhé.</div>`; return; }
+  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào vào lớp.<br>Gửi <b>mã lớp ${esc(STATE.codeShort||STATE.code)}</b> cho các em để đăng ký nhé.</div>
+    <p class="center" style="margin-top:10px"><button class="linklike" id="bk">← Lớp khác</button></p>`;
+    const bk=$('#bk'); if(bk) bk.onclick=viewTeacherHome; return; }
   const rows=[];
   for(const s of stus.docs){ const d=s.data();
     const cards=(await cardsCol(STATE.code,s.id).get()).docs.map(x=>x.data());
@@ -766,14 +896,17 @@ async function teacherDash(){
     const weak=cards.filter(c=>(c.wrong||0)>(c.correct||0)).length;
     const mastered=cards.filter(c=>(c.mastery||0)>=5).length;
     const totSec=sess.reduce((n,x)=>n+(x.dur||0),0), rev=sess.reduce((n,x)=>n+(x.reviewed||0),0), corr=sess.reduce((n,x)=>n+(x.correct||0),0);
-    rows.push({name:d.name,streak:d.streak||0,learned:cards.length,mastered,weak,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,_sess:sess}); }
+    rows.push({name:d.name,email:d.email||'',streak:d.streak||0,learned:cards.length,mastered,weak,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,_sess:sess}); }
   const avgAcc=rows.length?Math.round(rows.reduce((n,r)=>n+r.acc,0)/rows.length):0;
-  let html=`<div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>HỌC VIÊN</span></div><div class="stat"><b>${avgAcc}%</b><span>ĐÚNG TB</span></div><div class="stat"><b>${rows.reduce((n,r)=>n+r.mastered,0)}</b><span>TỪ THUỘC</span></div></div>
-    <div class="row" style="margin:14px 0"><button class="btn sm" id="csv">⬇️ Xuất CSV để phân tích</button></div>
-    <div class="tbl-wrap"><table><thead><tr><th>Tên</th><th>🔥</th><th>Đã học</th><th>Thuộc</th><th>Từ yếu</th><th>Buổi</th><th>T.gian</th><th>Đúng</th></tr></thead><tbody>`;
-  rows.forEach(r=>html+=`<tr><td>${esc(r.name)}</td><td>${r.streak}</td><td>${r.learned}</td><td>${r.mastered}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${fmtDur(r.time)}</td><td>${r.acc}%</td></tr>`);
+  let html=`<div class="row" style="margin-bottom:10px"><button class="linklike" id="bk">← Lớp khác</button> &nbsp;·&nbsp; Mã lớp: <b>${esc(STATE.codeShort||STATE.code)}</b></div>
+    <div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>HỌC VIÊN</span></div><div class="stat"><b>${avgAcc}%</b><span>ĐÚNG TB</span></div><div class="stat"><b>${rows.reduce((n,r)=>n+r.mastered,0)}</b><span>TỪ THUỘC</span></div></div>
+    <div class="row" style="margin:14px 0"><button class="btn sm" id="csv">⬇️ Xuất CSV</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Tên</th><th>Email</th><th>🔥</th><th>Đã học</th><th>Thuộc</th><th>Từ yếu</th><th>Buổi</th><th>Đúng</th><th></th></tr></thead><tbody>`;
+  rows.forEach(r=>html+=`<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.email)}</td><td>${r.streak}</td><td>${r.learned}</td><td>${r.mastered}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${r.acc}%</td><td><button class="btn sm reset" data-email="${esc(r.email)}">Cấp lại MK</button></td></tr>`);
   html+='</tbody></table></div>'; panel.innerHTML=html;
+  const bk=$('#bk'); if(bk) bk.onclick=viewTeacherHome;
   $('#csv').onclick=()=>exportCSV(rows);
+  panel.querySelectorAll('.reset').forEach(b=>b.onclick=async()=>{const em=b.dataset.email;if(!em)return toast('Học viên này chưa có email');try{await auth.sendPasswordResetEmail(em);toast('Đã gửi mail đặt lại cho '+em);}catch(e){toast(authErr(e));}});
 }
 function exportCSV(rows){
   let lines=[['Tên','Chuỗi','Đã học','Thuộc','Từ yếu','Số buổi','Tổng giây','% đúng'].join(',')];
