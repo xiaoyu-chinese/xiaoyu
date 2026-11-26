@@ -376,21 +376,24 @@ function pageClassroom(){
     shell(`<div class="xcard" style="padding:0;overflow:hidden">
       <div class="live-head"><span><b>🔴 LIVE</b> · ${esc(STATE.codeShort||STATE.code)}</span><span class="muted">${esc(room.lessonTitle||'')}</span></div>
       <div class="live-progress">${LIVE_PHASES.map((p,i)=>`<span class="${i<=room.phaseIndex?'on':''}">${esc(p[0])}</span>`).join('')}</div>
-      <div style="margin:12px">${liveStage(q.zh,{sign:room.lessonTitle})}<div class="muted" style="text-align:center;margin-top:6px">Câu ${room.curIndex+1}/${total}</div></div>
+      <div style="margin:12px">${liveStage(q.zh)}<div class="muted" style="text-align:center;margin-top:6px">Câu ${room.curIndex+1}/${total}</div></div>
       <div id="answerbox" style="padding:0 12px 14px"></div>
     </div>`);
     renderAnswer(q);
   }
   function renderAnswer(q){
     const box=$('#answerbox'); if(!box)return;
+    const tools=`<div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn sm" id="again">🔊 Nghe lại</button><button class="btn sm" id="slow">🐢 Nói chậm</button><button class="btn sm" id="dunno">❓ Không hiểu</button></div><div id="feedback" style="margin-top:10px"></div>`;
+    if(q.type==='fill'){
+      box.innerHTML=`${tools}<p class="muted" style="margin-top:8px;font-size:.84rem">✍️ <b>Câu điền từ</b> — gõ từ còn thiếu vào ô dưới:</p><input class="ansbox" id="typed" placeholder="Điền từ tiếng Trung"><button class="btn block" id="sendtyped" style="margin-top:8px">Gửi</button>`;
+      $('#again').onclick=()=>speakZh(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
+      $('#sendtyped').onclick=()=>{ const v=($('#typed').value||'').trim(); if(v)evaluate(q,v); };
+      return;
+    }
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    box.innerHTML=`<div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap">
-        <button class="btn sm" id="again">🔊 Nghe lại</button><button class="btn sm" id="slow">🐢 Nói chậm</button><button class="btn sm" id="dunno">❓ Không hiểu</button>
-      </div><div id="feedback" style="margin-top:10px"></div>
-      ${SR?`<button class="btn block coral" id="rec" style="margin-top:10px">🎤 Nhấn để trả lời</button>`:`<p class="muted" style="margin-top:10px;font-size:.84rem">Trình duyệt chưa hỗ trợ thu âm (nên dùng Chrome máy tính). Cô/em có thể gõ câu trả lời:</p><input class="ansbox" id="typed" placeholder="Gõ câu trả lời tiếng Trung"><button class="btn block" id="sendtyped" style="margin-top:8px">Gửi</button>`}`;
+    box.innerHTML=`${tools}${SR?`<button class="btn block coral" id="rec" style="margin-top:10px">🎤 Nhấn để trả lời (nói)</button><p class="muted" style="text-align:center;margin-top:6px;font-size:.8rem">Câu này cần trả lời bằng <b>giọng nói</b>.</p>`:`<p class="muted" style="margin-top:10px;font-size:.84rem;text-align:center">🎤 Câu này cần trả lời bằng <b>giọng nói</b>. Thiết bị hiện không thu được âm — hãy mở bằng <b>Chrome trên máy tính</b> rồi cho phép micro.</p>`}`;
     $('#again').onclick=()=>speakZh(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
     const rec=$('#rec'); if(rec)rec.onclick=()=>startRec(q);
-    const st=$('#sendtyped'); if(st)st.onclick=()=>{ const v=($('#typed').value||'').trim(); if(v)evaluate(q,v); };
   }
   function showKeyword(){
     const w=(room.targetWords||[])[0]; if(!w)return toast('Không có từ khoá');
@@ -404,7 +407,7 @@ function pageClassroom(){
     liveSetState('recording');
     partsCol(STATE.code).doc(STATE.sid).update({state:'speaking'}).catch(()=>{});
     rec.onresult=e=>{ const txt=(e.results[0][0].transcript)||''; evaluate(q,txt); };
-    rec.onerror=()=>{ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} liveSetState(''); toast('Không thu được âm — thử lại'); };
+    rec.onerror=()=>{ if(btn){btn.textContent='🎤 Nhấn để trả lời (nói)';btn.disabled=false;} liveSetState(''); const fb=$('#feedback'); if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">🎤 Không thu được âm. Câu này cần trả lời bằng giọng nói — hãy mở web bằng <b>Chrome trên máy tính</b> và cho phép micro.</div>'; };
     rec.onend=()=>{ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} const el=document.getElementById('stage'); if(el&&el.classList.contains('recording'))liveSetState(''); };
     try{ rec.start(); }catch(e){ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} }
   }
@@ -1438,7 +1441,7 @@ const LIVE_CSS=`<style id="livecss">
 @media(max-width:820px){.live-grid{grid-template-columns:1fr}}
 .live-stage{position:relative;width:100%;max-width:620px;margin:0 auto;aspect-ratio:1200/941;border-radius:14px;overflow:hidden;background:#f3e9d9 center/cover no-repeat;background-image:url(live-room.jpg)}
 .live-sign{position:absolute;top:16.5%;left:50%;transform:translateX(-50%);width:26%;text-align:center;font-family:'Baloo 2',sans-serif;font-weight:800;color:#6b4a2b;font-size:clamp(.55rem,1.9vw,.95rem);line-height:1.05}
-.live-mascot{position:absolute;right:0;bottom:0;height:74%;filter:drop-shadow(0 4px 8px rgba(0,0,0,.22))}
+.live-mascot{position:absolute;right:0;bottom:0;height:74%;transform:scaleX(-1);filter:drop-shadow(0 4px 8px rgba(0,0,0,.22))}
 .live-bubble{position:absolute;left:4%;top:28%;max-width:52%;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-family:'Baloo 2',sans-serif;font-weight:700;font-size:clamp(.95rem,3vw,1.5rem);color:#243b53}
 .live-bubble:after{content:'';position:absolute;right:-9px;top:42%;border:9px solid transparent;border-left-color:#fff}
 .live-ring{position:absolute;right:14%;bottom:62%;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.05rem;opacity:0;transition:opacity .2s}
@@ -1461,7 +1464,9 @@ function speakZh(text,rate){
   if(!('speechSynthesis' in window)||!text) return;
   try{ speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=rate||0.95;
-    const vs=speechSynthesis.getVoices(); const zh=vs.find(v=>/zh|cmn|chinese/i.test((v.lang+' '+v.name).toLowerCase())); if(zh)u.voice=zh;
+    const vs=speechSynthesis.getVoices()||[]; const zhs=vs.filter(v=>/zh|cmn|chinese|普通话|中文/i.test((v.lang+' '+v.name).toLowerCase()));
+    const best=zhs.find(v=>/google|microsoft|微软|xiaoxiao|yaoyao|huihui|mei-?jia|ting-?ting|sinji/i.test(v.name.toLowerCase()))||zhs.find(v=>/zh-cn|zh_cn/i.test(v.lang.toLowerCase()))||zhs[0];
+    if(best)u.voice=best;
     u.onstart=()=>liveSetState('speaking');
     u.onend=()=>{ const el=document.getElementById('stage'); if(el&&el.classList.contains('speaking'))liveSetState(''); };
     speechSynthesis.speak(u);
@@ -1469,12 +1474,12 @@ function speakZh(text,rate){
 }
 function liveStage(qzh,opts){ opts=opts||{};
   return `<div class="live-stage" id="stage">
-    <div class="live-sign">${esc(opts.sign||'XiaoYu Chinese')}</div>
+    <div class="live-sign">${esc(opts.sign||'XiaoYu Class')}</div>
     <div class="live-badge" id="livebadge"></div>
     <div class="live-bubble">${esc(qzh||'…')}</div>
     <div class="live-ring spk">🔊</div>
     <div class="live-ring rec">🎤</div>
-    <img class="live-mascot" src="live-teacher.png" alt="">
+    <img class="live-mascot" src="live-teacher.png?v=2" alt="">
   </div>`;
 }
 function liveSetState(s){ const el=document.getElementById('stage'); if(!el)return; el.classList.remove('speaking','recording','praise'); if(s)el.classList.add(s); }
@@ -1494,7 +1499,7 @@ function liveSetup(){
       <div class="field ico" style="margin-top:8px"><label>Bài học</label><span class="ic">📘</span><select id="les">${lessons.map(l=>`<option value="${l.id}" ${l.id===lid?'selected':''}>${esc(l.title)}</option>`).join('')}</select></div>
       <p style="margin:10px 0 4px"><b>Từ vựng mục tiêu</b></p>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${tgt.map(w=>`<span class="pill">${esc(w.hanzi)} <small class="muted">${esc(w.pinyin)}</small></span>`).join('')||'<span class="muted">—</span>'}</div>
-      <p style="margin:12px 0 4px"><b>Câu hỏi của buổi</b> <small class="muted">(mỗi dòng 1 câu, cô sửa tuỳ ý)</small></p>
+      <p style="margin:12px 0 4px"><b>Câu hỏi của buổi</b> <small class="muted">(mỗi dòng 1 câu · câu có <b>___</b> là dạng điền từ (học sinh gõ), còn lại là dạng nói (bắt buộc trả lời bằng giọng))</small></p>
       <textarea id="qs" rows="7" style="width:100%;padding:10px;border:1px solid #e2e8f1;border-radius:9px;font:inherit">${esc(autoQ(les).join('\n'))}</textarea>
       <button class="btn block" id="open" style="margin-top:14px">▶ Mở phòng Live</button>
     </div></div>`);
@@ -1503,7 +1508,7 @@ function liveSetup(){
     $('#open').onclick=async()=>{
       const les2=lessons.find(l=>l.id===lid)||{words:[]};
       const tgt2=(les2.words||[]).slice(0,6).map(w=>({hanzi:w.hanzi,pinyin:w.pinyin,vi:w.vi}));
-      const questions=($('#qs').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(zh=>({zh}));
+      const questions=($('#qs').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(zh=>({zh,type:(zh.includes('___')||zh.includes('＿'))?'fill':'speak'}));
       if(!questions.length) return toast('Cần ít nhất 1 câu hỏi');
       const btn=$('#open'); btn.disabled=true; btn.textContent='Đang mở…';
       try{
@@ -1546,7 +1551,7 @@ function liveTeacherConsole(){
         </aside>
         <main class="soft" style="padding:14px">
           <div class="spread"><b>Câu ${room.curIndex+1}/${total}</b><span class="muted">${parts.length} tham gia</span></div>
-          <div style="margin-top:8px">${liveStage(cur.zh,{sign:room.lessonTitle})}</div>
+          <div style="margin-top:8px">${liveStage(cur.zh)}</div>
           <div class="row" style="justify-content:center;gap:8px;margin-top:10px"><button class="btn sm" id="prev" ${room.curIndex<=0?'disabled':''}>← Câu trước</button><button class="btn sm" id="say">🔊 Đọc câu</button><button class="btn sm" id="next" ${room.curIndex>=total-1?'disabled':''}>Câu tiếp →</button></div>
           <b style="display:block;margin-top:14px">Danh sách học sinh (${parts.length})</b>
           <div class="tbl-wrap" style="margin-top:6px"><table><tbody>${parts.length?parts.map(p=>`<tr><td><b>${esc(p.name||'')}</b></td><td>${stChip(p.state)}</td><td class="muted">${p.answered||0} lượt</td></tr>`).join(''):'<tr><td class="muted">Chưa có học sinh vào phòng…</td></tr>'}</tbody></table></div>
