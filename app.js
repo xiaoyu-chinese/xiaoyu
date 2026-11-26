@@ -47,6 +47,9 @@ const cardsCol=(c,s)=>stuRef(c,s).collection('cards');
 const sessCol=(c,s)=>stuRef(c,s).collection('sessions');
 const testsCol=c=>clsRef(c).collection('tests');
 const resCol=(c,s)=>stuRef(c,s).collection('results');
+const liveRef=c=>clsRef(c).collection('live').doc('room');
+const partsCol=c=>liveRef(c).collection('participants');
+const turnsCol=c=>liveRef(c).collection('turns');
 
 /* ---- lịch lặp lại ngắt quãng (SM-2 rút gọn) + mức thành thạo chung ---- */
 function schedule(card,grade){
@@ -119,11 +122,11 @@ function shell(inner,rail){
   </div>`);
   root.querySelectorAll('[data-r]').forEach(b=>b.onclick=e=>{e.preventDefault();
     const r=b.dataset.r;
-    if(r==='_out'){STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewLanding();return;}
+    if(r==='_out'){liveCleanup();STATE.sid=null;STATE.role=null;ME=null;CARDS={};viewLanding();return;}
     go(r);
   });
 }
-function go(r){ ROUTE=r;
+function go(r){ ROUTE=r; liveCleanup();
   if(r==='home')return pageHome();
   if(r==='lessons')return pageLesson();
   if(r==='exercise'||r==='sbt')return pageSBT();
@@ -356,12 +359,71 @@ function pageMyWords(){
 
 /* ================= LỚP HỌC TRỰC TUYẾN (đang xây dựng) ================= */
 function pageClassroom(){
-  shell(`<div class="xcard center" style="padding:40px 22px">
-    <div class="big">🏫</div>
-    <h2 style="margin-top:8px">Lớp học trực tuyến</h2>
-    <p class="muted" style="max-width:520px;margin:10px auto 0">Phòng học tương tác thời gian thực (giáo viên tổ chức luyện tập, học sinh trả lời trên thiết bị, AI chấm & ghi nhận lỗi) đang được xây dựng theo từng giai đoạn.</p>
-    <span class="pill coral" style="margin-top:14px;display:inline-block">🚧 Sắp ra mắt</span>
-  </div>`);
+  liveCleanup(); ensureLiveCss(); STATE._liveUnsub=[];
+  let room=null, joined=false, lastIdx=-1;
+  function speakCur(){ if(room&&room.status==='open'){ const q=(room.questions||[])[room.curIndex]; if(q)speakZh(q.zh); } }
+  function paint(){
+    if(!room||room.status!=='open'){
+      shell(`<div class="xcard center" style="padding:40px 22px"><div class="big">🖥️</div><h2 style="margin-top:8px">Lớp Live</h2><p class="muted" style="max-width:420px;margin:10px auto 0">Chưa có buổi học nào đang diễn ra.<br>Vui lòng chờ giáo viên mở lớp.</p><span class="pill" style="margin-top:12px;display:inline-block">⏳ Đang chờ…</span></div>`);
+      joined=false; return;
+    }
+    if(!joined){
+      shell(`<div class="xcard" style="padding:0;overflow:hidden"><div class="live-join"><h2 style="margin:0">Lớp Live – ${esc(STATE.codeShort||STATE.code)}</h2><span class="chip g" style="margin-top:6px;display:inline-block">● Đang diễn ra</span><p style="margin-top:12px;font-size:1.15rem"><b>${esc(room.lessonTitle||'')}</b></p><p class="muted">${(room.questions||[]).length} câu luyện tập · GV ${esc(room.teacherName||'')}</p><button class="btn block" id="join" style="margin-top:14px">▶ Tham gia ngay</button></div></div>`);
+      const j=$('#join'); if(j)j.onclick=async()=>{ try{ await partsCol(STATE.code).doc(STATE.sid).set({name:(ME&&ME.name)||'',state:'listening',answered:0,joinedAt:now()}); joined=true; lastIdx=room.curIndex; paint(); setTimeout(speakCur,300); }catch(e){ toast(authErr(e)); } };
+      return;
+    }
+    const total=(room.questions||[]).length, q=(room.questions||[])[room.curIndex]||{};
+    shell(`<div class="xcard" style="padding:0;overflow:hidden">
+      <div class="live-head"><span><b>🔴 LIVE</b> · ${esc(STATE.codeShort||STATE.code)}</span><span class="muted">${esc(room.lessonTitle||'')}</span></div>
+      <div class="live-progress">${LIVE_PHASES.map((p,i)=>`<span class="${i<=room.phaseIndex?'on':''}">${esc(p[0])}</span>`).join('')}</div>
+      <div style="margin:12px">${liveStage(q.zh,{sign:room.lessonTitle})}<div class="muted" style="text-align:center;margin-top:6px">Câu ${room.curIndex+1}/${total}</div></div>
+      <div id="answerbox" style="padding:0 12px 14px"></div>
+    </div>`);
+    renderAnswer(q);
+  }
+  function renderAnswer(q){
+    const box=$('#answerbox'); if(!box)return;
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    box.innerHTML=`<div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" id="again">🔊 Nghe lại</button><button class="btn sm" id="slow">🐢 Nói chậm</button><button class="btn sm" id="dunno">❓ Không hiểu</button>
+      </div><div id="feedback" style="margin-top:10px"></div>
+      ${SR?`<button class="btn block coral" id="rec" style="margin-top:10px">🎤 Nhấn để trả lời</button>`:`<p class="muted" style="margin-top:10px;font-size:.84rem">Trình duyệt chưa hỗ trợ thu âm (nên dùng Chrome máy tính). Cô/em có thể gõ câu trả lời:</p><input class="ansbox" id="typed" placeholder="Gõ câu trả lời tiếng Trung"><button class="btn block" id="sendtyped" style="margin-top:8px">Gửi</button>`}`;
+    $('#again').onclick=()=>speakZh(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
+    const rec=$('#rec'); if(rec)rec.onclick=()=>startRec(q);
+    const st=$('#sendtyped'); if(st)st.onclick=()=>{ const v=($('#typed').value||'').trim(); if(v)evaluate(q,v); };
+  }
+  function showKeyword(){
+    const w=(room.targetWords||[])[0]; if(!w)return toast('Không có từ khoá');
+    const box=$('#feedback'); if(box)box.innerHTML=`<div class="soft" style="padding:10px"><b style="font-size:1.1rem">${esc(w.hanzi)}</b> <span class="muted">${esc(w.pinyin)}</span> — ${esc(w.vi)}</div>`;
+    speakZh(w.hanzi);
+  }
+  function startRec(q){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR)return;
+    const rec=new SR(); STATE._rec=rec; rec.lang='zh-CN'; rec.interimResults=false; rec.maxAlternatives=1;
+    const btn=$('#rec'); if(btn){btn.textContent='● Đang thu âm… (nói đi)';btn.disabled=true;}
+    liveSetState('recording');
+    partsCol(STATE.code).doc(STATE.sid).update({state:'speaking'}).catch(()=>{});
+    rec.onresult=e=>{ const txt=(e.results[0][0].transcript)||''; evaluate(q,txt); };
+    rec.onerror=()=>{ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} liveSetState(''); toast('Không thu được âm — thử lại'); };
+    rec.onend=()=>{ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} const el=document.getElementById('stage'); if(el&&el.classList.contains('recording'))liveSetState(''); };
+    try{ rec.start(); }catch(e){ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} }
+  }
+  async function evaluate(q,transcript){
+    const tgt=(room.targetWords||[]); const usedW=tgt.find(w=>transcript.includes(w.hanzi)); const used=!!usedW;
+    const correct=transcript.trim().length>=2; const score=correct?(used?10:7):4;
+    const feedback=used?`回答得很好！你使用了「${usedW.hanzi}」，而且表达很自然。`:correct?'很好！下次试着用上目标词语。':'再试一次，说一句完整的话。';
+    const box=$('#feedback'); if(box)box.innerHTML=`<div class="soft" style="padding:12px"><div class="muted" style="font-size:.85rem">Bạn nói: ${esc(transcript)}</div><div style="margin-top:6px">✅ ${esc(feedback)}</div><div style="margin-top:6px"><span class="pill jade">⭐ +${score} điểm</span></div></div>`;
+    liveSetState(''); liveBadge('⭐ +'+score); setTimeout(()=>liveBadge(''),3200);
+    setTimeout(()=>speakZh(feedback),200);
+    try{ await turnsCol(STATE.code).add({uid:STATE.sid,name:(ME&&ME.name)||'',qIndex:room.curIndex,qzh:q.zh,transcript,score,correct,usedTarget:used,feedback,at:now()}); }catch(e){}
+    try{ await partsCol(STATE.code).doc(STATE.sid).update({state:'answered',answered:firebase.firestore.FieldValue.increment(1)}); }catch(e){}
+  }
+  STATE._liveUnsub.push(liveRef(STATE.code).onSnapshot(d=>{
+    const prev=room; room=d.exists?d.data():null;
+    const idxChanged=room&&room.status==='open'&&room.curIndex!==lastIdx;
+    paint();
+    if(joined&&room&&room.status==='open'&&idxChanged){ lastIdx=room.curIndex; setTimeout(speakCur,300); if(prev&&prev.curIndex!==room.curIndex)partsCol(STATE.code).doc(STATE.sid).update({state:'listening'}).catch(()=>{}); }
+  }));
 }
 async function pageTest(){
   shell('<div class="xcard"><p class="muted">Đang tải bài kiểm tra…</p></div>');
@@ -1002,6 +1064,7 @@ const TC_CSS=`<style>
 </style>`;
 const TC_NAV=[['overview','📊','Tổng quan'],['classes','🏫','Quản lý lớp học'],['students','👥','Học viên'],['vocab','📖','Phân tích từ vựng'],['convo','💬','Lịch sử hội thoại AI'],['report','📋','Báo cáo buổi học'],['tests','📝','Kiểm tra & đánh giá'],['progress','📈','Phân tích tiến bộ'],['settings','⚙️','Cài đặt']];
 function viewTeacher(screen){
+  liveCleanup();
   screen=screen||STATE.tcScreen||'overview'; STATE.tcScreen=screen;
   render(`${TC_CSS}<div class="tconsole">
     <aside class="tc-side">
@@ -1125,12 +1188,9 @@ async function tcOverview(body){
         <div><span class="dotc" style="background:#f0a500"></span>Chưa vững <b>${classBk.a}</b></div>
         <div><span class="dotc" style="background:#e5484d"></span>Chưa ghi nhớ <b>${classBk.wt}</b></div>
       </div></div></div>
-    <div class="soft" style="padding:14px;${dashed}"><div class="spread"><b>🎥 Lớp học trực tuyến (Live)</b><button class="linklike" id="toLive">Xem chi tiết →</button></div>
-      <p class="muted" style="margin-top:10px">Chưa có buổi Live. Khu vực luyện nghe–nói với AI — <b>sắp ra mắt</b> (cần backend AI Speaking Tutor).</p>
-      <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
-        <div class="stat" style="padding:8px"><b>—</b><span>BUỔI LIVE</span></div>
-        <div class="stat" style="padding:8px"><b>—</b><span>TỶ LỆ THAM GIA</span></div>
-      </div></div>
+    <div class="soft" style="padding:14px"><div class="spread"><b>🎥 Lớp học trực tuyến (Live)</b></div>
+      <p class="muted" style="margin:8px 0">Mở buổi luyện nghe–nói với AI: học sinh vào phòng, AI hỏi – học sinh nói – AI chấm, mọi lượt lưu vào Lịch sử hội thoại.</p>
+      <button class="btn block" id="toLive">▶ Mở phòng Live</button></div>
   </div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:14px">
     <div class="soft" style="padding:14px"><b>🔥 Top từ vựng cần ôn tập của lớp</b>${hard.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ</th><th>Nghĩa</th><th>% đúng</th><th>Số em sai</th></tr></thead><tbody>${hard.map(h=>`<tr><td style="font-size:1.05rem">${esc(h.w.hanzi)}</td><td>${esc(h.w.vi)}</td><td>${h.pct}%</td><td><b>${h.n}</b></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ khó nổi bật.</p>'}</div>
@@ -1156,7 +1216,8 @@ async function tcOverview(body){
     <div class="soft" style="padding:14px"><div class="spread"><b>📈 Phân tích tiến bộ</b><button class="linklike" id="toProg">→</button></div>${linePts.length>=2?lineChart(linePts):'<p class="muted" style="margin-top:10px">Cần ≥2 buổi học để thấy xu hướng tiến bộ.</p>'}</div>
   </div>`;
   const on=(id,s)=>{const b=$(id);if(b)b.onclick=()=>viewTeacher(s);};
-  on('#toLive','report');on('#toStu2','students');on('#toVocab','vocab');on('#toReport','report');on('#toTests','tests');on('#toProg','progress');
+  {const _l=$('#toLive');if(_l)_l.onclick=()=>liveSetup();}
+  on('#toStu2','students');on('#toVocab','vocab');on('#toReport','report');on('#toTests','tests');on('#toProg','progress');
 }
 function bucketsForIds(rows, ids){
   let g=0,b=0,a=0,wt=0;
@@ -1253,7 +1314,7 @@ async function tcClasses(body){
     const tabs=[['list','Danh sách lớp'],['sched','Lịch học'],['assign','Phân công'],['mat','Tài liệu lớp']];
     const trs=classes.map(c=>`<tr><td><b>Lớp ${esc(c.code)}</b></td><td>${esc(c.level||'')}</td><td>${c._n}</td><td class="muted">—</td><td><span class="chip g">Đang học</span></td><td><button class="btn sm go" data-id="${esc(c.id)}" title="Mở lớp">Mở</button></td></tr>`).join('');
     const other=tab==='sched'?'Lịch học từng lớp — sẽ bổ sung khi cô thiết lập thời khoá biểu.':tab==='assign'?'Phân công giáo viên/trợ giảng — dành cho giai đoạn nhiều lớp.':'Tài liệu & giáo trình của lớp — sắp bổ sung.';
-    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><button class="btn sm" id="mk">+ Tạo lớp học</button></div>
+    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><div style="display:flex;gap:6px"><button class="btn sm" id="live">🎥 Mở phòng Live</button><button class="btn sm" id="mk">+ Tạo lớp học</button></div></div>
     <div class="grid" style="grid-template-columns:1.6fr 1fr;gap:14px">
       <div class="soft" style="padding:10px">${tab==='list'?`<div class="tbl-wrap"><table><thead><tr><th>Tên lớp</th><th>Khóa học</th><th>Số học viên</th><th>Lịch học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${classes.length?trs:`<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">Chưa có lớp nào.</td></tr>`}</tbody></table></div>`:`<div style="padding:28px;text-align:center" class="muted">${other}</div>`}</div>
       <div class="soft" style="padding:16px"><b>Thông tin lớp: ${esc(cur.code||'—')}</b><div style="margin-top:10px">
@@ -1267,28 +1328,42 @@ async function tcClasses(body){
     </div>`;
     body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
     const mk=$('#mk'); if(mk)mk.onclick=()=>viewCreateClass(STATE.courseId);
+    const lv=$('#live'); if(lv)lv.onclick=()=>liveSetup();
     const dt=$('#detail'); if(dt)dt.onclick=()=>viewTeacher('students');
     body.querySelectorAll('.go').forEach(b=>b.onclick=()=>{const c=classes.find(x=>x.id===b.dataset.id);if(!c)return;STATE.code=c.id;STATE.codeShort=c.code;STATE.courseId=c.level;STATE.cls=c;STATE._rows=null;viewTeacher('overview');});
   }
   render();
 }
-function tcConvo(body){
-  const demo=(a,b)=>`<div class="bubble ai">${a}</div><div class="bubble hs">${b}</div>`;
-  body.innerHTML=`
-  <div class="soft dcard" style="padding:12px;margin-bottom:12px"><p class="muted" style="margin:0">💬 <b>Lịch sử hội thoại AI</b> — hiển thị từng lượt luyện nói của học viên với AI kèm chấm điểm tự động. Cần hệ <b>AI Speaking Tutor</b> (nhận giọng → AI phản hồi → chấm). Giao diện đã dựng sẵn; khi backend AI hoạt động, mỗi lượt nói + đánh giá sẽ tự lưu vào đây.</p></div>
-  <div class="tc-filters" style="margin-bottom:12px"><select disabled><option>Học viên: (chưa có dữ liệu)</option></select><select disabled><option>Buổi học</option></select><select disabled><option>Loại: Tất cả</option></select></div>
-  <div class="grid" style="grid-template-columns:.9fr 1.3fr 1fr;gap:12px">
-    <div class="soft" style="padding:12px"><b>Danh sách lượt hội thoại</b><div style="margin-top:8px">${[1,2,3,4].map(i=>`<div class="soft" style="padding:8px;margin-bottom:6px"><b class="sk">Lượt ${i}</b><div class="sk" style="margin-top:4px">———————</div></div>`).join('')}</div></div>
-    <div class="soft" style="padding:12px"><b>Chi tiết hội thoại</b><div style="margin-top:8px;opacity:.55">${demo('你周末打算做什么？','我打算去爬山。')}${demo('你为什么喜欢爬山？','因为爬山让我放松。')}</div><p class="muted" style="margin-top:8px;font-size:.8rem">(Nội dung minh hoạ cấu trúc)</p></div>
-    <div class="soft" style="padding:12px"><b>Đánh giá lượt nói</b><div style="margin-top:8px">
-      <div class="kv"><span>Điểm</span><b>—/100</b></div>
-      <div class="kv"><span>Từ vựng</span><b>—</b></div>
-      <div class="kv"><span>Ngữ pháp</span><b>—</b></div>
-      <div class="kv"><span>Phản hồi</span><b>—</b></div>
-      <div class="kv"><span>Phát âm</span><b>—</b></div>
-      <div class="kv"><span>Lưu loát</span><b>—</b></div>
-    </div><div class="soft dcard" style="padding:10px;margin-top:10px"><b>Phân tích & nhận xét AI</b><p class="muted" style="margin:6px 0 0;font-size:.84rem">Nhận xét tự động về cách dùng từ, ngữ pháp và gợi ý mở rộng câu sẽ hiện ở đây.</p></div></div>
-  </div>`;
+async function tcConvo(body){
+  body.innerHTML='<p class="muted">Đang tải hội thoại…</p>';
+  let turns=[];
+  try{ const q=await turnsCol(STATE.code).get(); turns=q.docs.map(d=>d.data()); }catch(e){}
+  turns.sort((a,b)=>(a.at||0)-(b.at||0));
+  if(!turns.length){
+    body.innerHTML=`<div class="soft dcard" style="padding:20px;text-align:center"><div style="font-size:1.8rem">💬</div><p class="muted" style="max-width:520px;margin:8px auto 0">Chưa có hội thoại nào. Khi cô <b>mở phòng Live</b> và học sinh luyện nói với AI, mỗi lượt nói + điểm sẽ tự lưu vào đây — cô xem lại các em đã nói gì, dùng từ và diễn đạt ra sao.</p><p style="margin-top:10px"><button class="btn sm" id="golive">🎥 Mở phòng Live</button></p></div>`;
+    const g=$('#golive'); if(g)g.onclick=()=>liveSetup(); return;
+  }
+  const byUid={}; turns.forEach(t=>{ (byUid[t.uid]=byUid[t.uid]||{name:t.name||'(học viên)',items:[]}).items.push(t); });
+  const uids=Object.keys(byUid); let sel=uids[0];
+  function render(){
+    const list=uids.map(u=>`<button class="listbtn ${u===sel?'on':''}" data-u="${esc(u)}" style="${u===sel?'border-color:#6d5cf0':''}"><div class="spread"><b>${esc(byUid[u].name)}</b><span class="pill">${byUid[u].items.length} lượt</span></div></button>`).join('');
+    const g=byUid[sel]||{items:[]};
+    const nUsed=g.items.filter(t=>t.usedTarget).length, nOk=g.items.filter(t=>t.correct).length;
+    const avg=g.items.length?Math.round(g.items.reduce((n,t)=>n+(t.score||0),0)/g.items.length*10):0;
+    const detail=g.items.map(t=>`<div style="margin-bottom:12px"><div class="bubble ai">🔊 ${esc(t.qzh||'')}</div><div class="bubble hs">${esc(t.transcript||'')}</div><div style="font-size:.82rem;margin-top:2px"><span class="pill ${t.correct?'jade':''}">⭐ ${t.score||0}/10</span> ${t.usedTarget?'<span class="chip g">có dùng từ mục tiêu</span>':'<span class="chip n">chưa dùng từ mục tiêu</span>'}</div><div class="muted" style="font-size:.82rem;margin-top:3px">AI: ${esc(t.feedback||'')}</div></div>`).join('');
+    body.innerHTML=`<div class="grid" style="grid-template-columns:.9fr 1.4fr 1fr;gap:12px">
+      <div class="soft" style="padding:12px"><b>Học viên</b><div style="margin-top:8px">${list}</div></div>
+      <div class="soft" style="padding:12px"><b>Chi tiết hội thoại — ${esc(g.name||'')}</b><div style="margin-top:10px">${detail}</div></div>
+      <div class="soft" style="padding:12px"><b>Đánh giá tổng hợp</b><div style="margin-top:8px">
+        <div class="kv"><span>Số lượt nói</span><b>${g.items.length}</b></div>
+        <div class="kv"><span>Điểm TB (quy đổi)</span><b>${avg}/100</b></div>
+        <div class="kv"><span>Lượt dùng từ mục tiêu</span><b>${nUsed}/${g.items.length}</b></div>
+        <div class="kv"><span>Lượt đạt</span><b>${nOk}/${g.items.length}</b></div>
+      </div><div class="soft dcard" style="padding:10px;margin-top:10px"><b>Nhận xét AI nâng cao</b><p class="muted" style="margin:6px 0 0;font-size:.82rem">Hiện dùng chấm cục bộ (dùng từ mục tiêu + độ dài câu). Khi cắm LLM, phần này sẽ phân tích ngữ pháp & phát âm chi tiết.</p></div></div>
+    </div>`;
+    body.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{sel=b.dataset.u;render();});
+  }
+  render();
 }
 async function tcReport(body){
   body.innerHTML='<p class="muted">Đang tải…</p>';
@@ -1344,6 +1419,177 @@ async function seedSampleTest(){
     toast('Đã tạo đề mẫu 🎉');
     const body=$('#panel'); if(body)tcTests(body);
   }catch(e){ toast('Lỗi tạo đề: '+authErr(e)); }
+}
+/* ================= LỚP HỌC TRỰC TUYẾN (LIVE – realtime) ================= */
+const LIVE_PHASES=[['Khởi động',5],['Luyện tập',15],['Vận dụng',10],['Tổng kết',5]];
+const LIVE_CSS=`<style id="livecss">
+.live-wrap{max-width:1180px;margin:0 auto;padding:12px}
+.live-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.live-grid{display:grid;grid-template-columns:230px 1fr 240px;gap:12px}
+.live-board{background:linear-gradient(135deg,#2f6b4f,#255a42);border-radius:14px;padding:26px 16px;color:#fff;text-align:center}
+.live-q{font-size:1.5rem;font-weight:800;font-family:'Baloo 2',sans-serif;line-height:1.4}
+.phbtn{display:block;width:100%;text-align:left;background:none;border:1px solid #eef2f7;border-radius:9px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-weight:600;color:inherit}
+.phbtn.on{background:#eef0ff;color:#4b43c4;border-color:#d8dcff}
+.live-join{padding:34px 22px;text-align:center;background:linear-gradient(135deg,#eef0ff,#fff)}
+.live-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fde8e8;color:#c0362f;font-weight:700}
+.live-progress{display:flex;gap:4px;padding:10px 14px;flex-wrap:wrap}
+.live-progress span{flex:1;text-align:center;font-size:.78rem;font-weight:700;color:#9aa8b8;border-bottom:3px solid #eef2f7;padding-bottom:4px}
+.live-progress span.on{color:#4b43c4;border-bottom-color:#4b43c4}
+@media(max-width:820px){.live-grid{grid-template-columns:1fr}}
+.live-stage{position:relative;width:100%;max-width:620px;margin:0 auto;aspect-ratio:1200/941;border-radius:14px;overflow:hidden;background:#f3e9d9 center/cover no-repeat;background-image:url(live-room.jpg)}
+.live-sign{position:absolute;top:16.5%;left:50%;transform:translateX(-50%);width:26%;text-align:center;font-family:'Baloo 2',sans-serif;font-weight:800;color:#6b4a2b;font-size:clamp(.55rem,1.9vw,.95rem);line-height:1.05}
+.live-mascot{position:absolute;right:0;bottom:0;height:74%;filter:drop-shadow(0 4px 8px rgba(0,0,0,.22))}
+.live-bubble{position:absolute;left:4%;top:28%;max-width:52%;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-family:'Baloo 2',sans-serif;font-weight:700;font-size:clamp(.95rem,3vw,1.5rem);color:#243b53}
+.live-bubble:after{content:'';position:absolute;right:-9px;top:42%;border:9px solid transparent;border-left-color:#fff}
+.live-ring{position:absolute;right:14%;bottom:62%;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.05rem;opacity:0;transition:opacity .2s}
+.live-stage.speaking .live-ring.spk{opacity:1;background:rgba(79,110,247,.92);color:#fff;animation:lrpulse 1.2s infinite}
+.live-stage.recording .live-ring.rec{opacity:1;background:rgba(168,85,247,.94);color:#fff;animation:lrpulse 1.05s infinite}
+@keyframes lrpulse{0%{box-shadow:0 0 0 0 rgba(120,100,240,.5)}70%{box-shadow:0 0 0 15px rgba(120,100,240,0)}100%{box-shadow:0 0 0 0 rgba(120,100,240,0)}}
+.live-badge{position:absolute;left:6%;top:15%;background:#ffd54a;color:#7a5600;font-weight:800;border-radius:999px;padding:4px 12px;font-size:.9rem;opacity:0;transition:.3s}
+.live-badge.show{opacity:1}
+</style>`;
+function ensureLiveCss(){ if(!document.getElementById('livecss')){ const d=document.createElement('div'); d.innerHTML=LIVE_CSS; const s=d.firstChild; if(s)document.head.appendChild(s); } }
+let LIVE_TIMER=null;
+function liveCleanup(){
+  if(STATE._liveUnsub){ STATE._liveUnsub.forEach(u=>{try{u();}catch(e){}}); }
+  STATE._liveUnsub=[];
+  if(LIVE_TIMER){ clearInterval(LIVE_TIMER); LIVE_TIMER=null; }
+  try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+  if(STATE._rec){ try{STATE._rec.abort();}catch(e){} STATE._rec=null; }
+}
+function speakZh(text,rate){
+  if(!('speechSynthesis' in window)||!text) return;
+  try{ speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=rate||0.95;
+    const vs=speechSynthesis.getVoices(); const zh=vs.find(v=>/zh|cmn|chinese/i.test((v.lang+' '+v.name).toLowerCase())); if(zh)u.voice=zh;
+    u.onstart=()=>liveSetState('speaking');
+    u.onend=()=>{ const el=document.getElementById('stage'); if(el&&el.classList.contains('speaking'))liveSetState(''); };
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function liveStage(qzh,opts){ opts=opts||{};
+  return `<div class="live-stage" id="stage">
+    <div class="live-sign">${esc(opts.sign||'XiaoYu Chinese')}</div>
+    <div class="live-badge" id="livebadge"></div>
+    <div class="live-bubble">${esc(qzh||'…')}</div>
+    <div class="live-ring spk">🔊</div>
+    <div class="live-ring rec">🎤</div>
+    <img class="live-mascot" src="live-teacher.png" alt="">
+  </div>`;
+}
+function liveSetState(s){ const el=document.getElementById('stage'); if(!el)return; el.classList.remove('speaking','recording','praise'); if(s)el.classList.add(s); }
+function liveBadge(txt){ const b=document.getElementById('livebadge'); if(!b)return; b.textContent=txt||''; b.classList.toggle('show',!!txt); }
+function fmtClock(sec){ sec=Math.max(0,Math.floor(sec)); const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60; const p=n=>String(n).padStart(2,'0'); return (h?p(h)+':':'')+p(m)+':'+p(s); }
+function liveSetup(){
+  ensureLiveCss();
+  const lessons=(typeof LESSONS!=='undefined'?LESSONS:[]);
+  let lid=(lessons[0]&&lessons[0].id)||'';
+  const autoQ=les=>{ const tgt=((les&&les.words)||[]).slice(0,4); const qs=['大家好！我们今天来练习。']; tgt.forEach(w=>qs.push(`请用「${w.hanzi}」说一句话。`)); qs.push('你周末打算做什么？'); return qs; };
+  function draw(){
+    const les=lessons.find(l=>l.id===lid)||lessons[0]||{words:[]};
+    const tgt=(les.words||[]).slice(0,6);
+    render(`<div class="wrap" style="max-width:720px"><div class="card">
+      <div class="spread"><h2 style="margin:0">🎥 Mở phòng Live</h2><button class="linklike" id="bk">← Quay lại</button></div>
+      <p class="muted">Chọn bài, kiểm tra từ mục tiêu & câu hỏi rồi mở phòng — học sinh sẽ thấy ngay.</p>
+      <div class="field ico" style="margin-top:8px"><label>Bài học</label><span class="ic">📘</span><select id="les">${lessons.map(l=>`<option value="${l.id}" ${l.id===lid?'selected':''}>${esc(l.title)}</option>`).join('')}</select></div>
+      <p style="margin:10px 0 4px"><b>Từ vựng mục tiêu</b></p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${tgt.map(w=>`<span class="pill">${esc(w.hanzi)} <small class="muted">${esc(w.pinyin)}</small></span>`).join('')||'<span class="muted">—</span>'}</div>
+      <p style="margin:12px 0 4px"><b>Câu hỏi của buổi</b> <small class="muted">(mỗi dòng 1 câu, cô sửa tuỳ ý)</small></p>
+      <textarea id="qs" rows="7" style="width:100%;padding:10px;border:1px solid #e2e8f1;border-radius:9px;font:inherit">${esc(autoQ(les).join('\n'))}</textarea>
+      <button class="btn block" id="open" style="margin-top:14px">▶ Mở phòng Live</button>
+    </div></div>`);
+    $('#bk').onclick=()=>viewTeacher('overview');
+    $('#les').onchange=e=>{lid=e.target.value;draw();};
+    $('#open').onclick=async()=>{
+      const les2=lessons.find(l=>l.id===lid)||{words:[]};
+      const tgt2=(les2.words||[]).slice(0,6).map(w=>({hanzi:w.hanzi,pinyin:w.pinyin,vi:w.vi}));
+      const questions=($('#qs').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(zh=>({zh}));
+      if(!questions.length) return toast('Cần ít nhất 1 câu hỏi');
+      const btn=$('#open'); btn.disabled=true; btn.textContent='Đang mở…';
+      try{
+        try{ const ps=await partsCol(STATE.code).get(); if(!ps.empty){const b=db.batch();ps.docs.forEach(d=>b.delete(d.ref));await b.commit();} }catch(e){}
+        try{ const ts=await turnsCol(STATE.code).get(); if(!ts.empty){const b=db.batch();ts.docs.forEach(d=>b.delete(d.ref));await b.commit();} }catch(e){}
+        await liveRef(STATE.code).set({status:'open',lessonTitle:les2.title||'',questions,targetWords:tgt2,phaseIndex:1,curIndex:0,startedAt:now(),endedAt:null,teacherName:(STATE.me&&STATE.me.name)||''});
+        toast('Đã mở phòng Live 🎉'); liveTeacherConsole();
+      }catch(e){ btn.disabled=false; btn.textContent='▶ Mở phòng Live'; toast(authErr(e)); }
+    };
+  }
+  draw();
+}
+function liveTeacherConsole(){
+  liveCleanup(); ensureLiveCss(); STATE._liveUnsub=[];
+  let room=null, parts=[], turns=[];
+  function setIdx(i){ const total=((room&&room.questions)||[]).length; if(i<0||i>=total)return; liveRef(STATE.code).update({curIndex:i}).catch(()=>{}); }
+  async function endLive(){ if(!confirm('Kết thúc buổi Live?'))return; try{ await liveRef(STATE.code).update({status:'ended',endedAt:now()}); }catch(e){} liveReport(); }
+  function paint(){
+    if(!room){ render('<div class="wrap"><div class="card"><p class="muted">Đang tải phòng…</p></div></div>'); return; }
+    if(room.status!=='open'){ liveReport(); return; }
+    const total=(room.questions||[]).length, cur=(room.questions||[])[room.curIndex]||{};
+    const answered=parts.filter(p=>p.state==='answered').length;
+    const acc=turns.length?Math.round(turns.filter(t=>t.correct).length/turns.length*100):0;
+    const usedPct=turns.length?Math.round(turns.filter(t=>t.usedTarget).length/turns.length*100):0;
+    const wc={}; (room.targetWords||[]).forEach(w=>wc[w.hanzi]=0);
+    turns.forEach(t=>{ (room.targetWords||[]).forEach(w=>{ if((t.transcript||'').includes(w.hanzi)) wc[w.hanzi]++; }); });
+    const wcArr=Object.keys(wc).map(h=>({h,n:wc[h]})).sort((a,b)=>b.n-a.n);
+    const stChip=s=>s==='speaking'?'<span class="chip r">Đang nói</span>':s==='answered'?'<span class="chip g">Đã trả lời</span>':s==='listening'?'<span class="chip b">Đang nghe</span>':'<span class="chip n">Chờ lượt</span>';
+    const elapsed=room.startedAt?(Date.now()-room.startedAt)/1000:0;
+    render(`<div class="live-wrap">
+      <div class="live-top">
+        <div><b style="font-family:'Baloo 2'">🎥 Lớp Live – ${esc(STATE.codeShort||STATE.code)}</b> · ${esc(room.lessonTitle||'')}</div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="chip r">● Đang diễn ra</span><span class="pill" id="clk">${fmtClock(elapsed)}</span><button class="btn sm" id="end" style="background:#e5484d;color:#fff">⏹ Kết thúc</button></div>
+      </div>
+      <div class="live-grid">
+        <aside class="soft" style="padding:12px"><b>Tiến trình buổi học</b>
+          <div style="margin-top:8px">${LIVE_PHASES.map((p,i)=>`<button class="phbtn ${i===room.phaseIndex?'on':''}" data-ph="${i}">${i<room.phaseIndex?'✅':i===room.phaseIndex?'◉':'○'} ${p[0]} <small class="muted">(${p[1]}p)</small></button>`).join('')}</div>
+          <b style="display:block;margin-top:12px">Từ vựng mục tiêu</b>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${(room.targetWords||[]).map(w=>`<span class="pill">${esc(w.hanzi)}</span>`).join('')||'—'}</div>
+        </aside>
+        <main class="soft" style="padding:14px">
+          <div class="spread"><b>Câu ${room.curIndex+1}/${total}</b><span class="muted">${parts.length} tham gia</span></div>
+          <div style="margin-top:8px">${liveStage(cur.zh,{sign:room.lessonTitle})}</div>
+          <div class="row" style="justify-content:center;gap:8px;margin-top:10px"><button class="btn sm" id="prev" ${room.curIndex<=0?'disabled':''}>← Câu trước</button><button class="btn sm" id="say">🔊 Đọc câu</button><button class="btn sm" id="next" ${room.curIndex>=total-1?'disabled':''}>Câu tiếp →</button></div>
+          <b style="display:block;margin-top:14px">Danh sách học sinh (${parts.length})</b>
+          <div class="tbl-wrap" style="margin-top:6px"><table><tbody>${parts.length?parts.map(p=>`<tr><td><b>${esc(p.name||'')}</b></td><td>${stChip(p.state)}</td><td class="muted">${p.answered||0} lượt</td></tr>`).join(''):'<tr><td class="muted">Chưa có học sinh vào phòng…</td></tr>'}</tbody></table></div>
+        </main>
+        <aside class="soft" style="padding:12px"><b>Thông tin lớp học</b>
+          <div class="kv"><span>Tham gia</span><b>${parts.length}</b></div>
+          <div class="kv"><span>Đã trả lời</span><b>${answered}</b></div>
+          <div class="kv"><span>Tỷ lệ trả lời đúng</span><b>${acc}%</b></div>
+          <div class="kv"><span>Dùng từ mục tiêu</span><b>${usedPct}%</b></div>
+          <b style="display:block;margin-top:12px">Từ được dùng nhiều</b>
+          <div style="margin-top:6px">${wcArr.map(x=>`<div class="kv"><span>${esc(x.h)}</span><b>${x.n} lần</b></div>`).join('')||'<span class="muted">—</span>'}</div>
+        </aside>
+      </div></div>`);
+    $('#end').onclick=endLive; $('#say').onclick=()=>speakZh(cur.zh);
+    $('#prev').onclick=()=>setIdx(room.curIndex-1); $('#next').onclick=()=>setIdx(room.curIndex+1);
+    root.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>liveRef(STATE.code).update({phaseIndex:+b.dataset.ph}).catch(()=>{}));
+  }
+  STATE._liveUnsub.push(liveRef(STATE.code).onSnapshot(d=>{ room=d.exists?d.data():null; paint(); }));
+  STATE._liveUnsub.push(partsCol(STATE.code).onSnapshot(q=>{ parts=q.docs.map(x=>({uid:x.id,...x.data()})); paint(); }));
+  STATE._liveUnsub.push(turnsCol(STATE.code).onSnapshot(q=>{ turns=q.docs.map(x=>x.data()); paint(); }));
+  LIVE_TIMER=setInterval(()=>{ const c=$('#clk'); if(c&&room&&room.startedAt)c.textContent=fmtClock((Date.now()-room.startedAt)/1000); },1000);
+}
+function liveReport(){
+  liveCleanup(); ensureLiveCss();
+  render('<div class="wrap"><div class="card"><p class="muted">Đang tổng kết…</p></div></div>');
+  Promise.all([liveRef(STATE.code).get(),partsCol(STATE.code).get(),turnsCol(STATE.code).get()]).then(([rd,ps,ts])=>{
+    const room=rd.exists?rd.data():{}; const parts=ps.docs.map(d=>d.data()); const turns=ts.docs.map(d=>d.data());
+    const nJoin=parts.length; const acc=turns.length?Math.round(turns.filter(t=>t.correct).length/turns.length*100):0;
+    const used=turns.length?Math.round(turns.filter(t=>t.usedTarget).length/turns.length*100):0;
+    const dur=room.startedAt&&room.endedAt?Math.round((room.endedAt-room.startedAt)/60000):0;
+    render(`<div class="wrap" style="max-width:640px"><div class="card center">
+      <div class="big">📋</div><h2>Báo cáo buổi học</h2>
+      <div class="grid cols3" style="margin-top:14px">
+        <div class="stat"><b>${nJoin}</b><span>THAM GIA</span></div>
+        <div class="stat"><b>${acc}%</b><span>TRẢ LỜI ĐÚNG</span></div>
+        <div class="stat"><b>${used}%</b><span>VẬN DỤNG TỪ</span></div>
+        <div class="stat"><b>${dur}p</b><span>THỜI LƯỢNG</span></div>
+      </div>
+      <button class="btn block" id="hist" style="margin-top:14px">Xem lịch sử hội thoại →</button>
+      <p style="margin-top:8px"><button class="linklike" id="bk">← Về bảng điều khiển</button></p>
+    </div></div>`);
+    $('#hist').onclick=()=>viewTeacher('convo'); $('#bk').onclick=()=>viewTeacher('overview');
+  }).catch(()=>viewTeacher('overview'));
 }
 async function tcProgress(body){
   body.innerHTML='<p class="muted">Đang tải…</p>';
