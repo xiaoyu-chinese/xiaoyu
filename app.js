@@ -50,6 +50,8 @@ const resCol=(c,s)=>stuRef(c,s).collection('results');
 const liveRef=c=>clsRef(c).collection('live').doc('room');
 const partsCol=c=>liveRef(c).collection('participants');
 const turnsCol=c=>liveRef(c).collection('turns');
+// === Cầu nối AI (Cloudflare Worker). Dán URL Worker vào đây để bật giọng AI + ghi âm + chấm AI ===
+let AI_BASE="https://xiaoyu-ai.tvtt8888.workers.dev";
 
 /* ---- lịch lặp lại ngắt quãng (SM-2 rút gọn) + mức thành thạo chung ---- */
 function schedule(card,grade){
@@ -361,7 +363,7 @@ function pageMyWords(){
 function pageClassroom(){
   liveCleanup(); ensureLiveCss(); STATE._liveUnsub=[];
   let room=null, joined=false, lastIdx=-1;
-  function speakCur(){ if(room&&room.status==='open'){ const q=(room.questions||[])[room.curIndex]; if(q)speakZh(q.zh); } }
+  function speakCur(){ if(room&&room.status==='open'){ const q=(room.questions||[])[room.curIndex]; if(q)aiSpeak(q.zh); } }
   function paint(){
     if(!room||room.status!=='open'){
       shell(`<div class="xcard center" style="padding:40px 22px"><div class="big">🖥️</div><h2 style="margin-top:8px">Lớp Live</h2><p class="muted" style="max-width:420px;margin:10px auto 0">Chưa có buổi học nào đang diễn ra.<br>Vui lòng chờ giáo viên mở lớp.</p><span class="pill" style="margin-top:12px;display:inline-block">⏳ Đang chờ…</span></div>`);
@@ -386,19 +388,41 @@ function pageClassroom(){
     const tools=`<div class="row" style="justify-content:center;gap:8px;flex-wrap:wrap"><button class="btn sm" id="again">🔊 Nghe lại</button><button class="btn sm" id="slow">🐢 Nói chậm</button><button class="btn sm" id="dunno">❓ Không hiểu</button></div><div id="feedback" style="margin-top:10px"></div>`;
     if(q.type==='fill'){
       box.innerHTML=`${tools}<p class="muted" style="margin-top:8px;font-size:.84rem">✍️ <b>Câu điền từ</b> — gõ từ còn thiếu vào ô dưới:</p><input class="ansbox" id="typed" placeholder="Điền từ tiếng Trung"><button class="btn block" id="sendtyped" style="margin-top:8px">Gửi</button>`;
-      $('#again').onclick=()=>speakZh(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
+      $('#again').onclick=()=>aiSpeak(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
       $('#sendtyped').onclick=()=>{ const v=($('#typed').value||'').trim(); if(v)evaluate(q,v); };
       return;
     }
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    box.innerHTML=`${tools}${SR?`<button class="btn block coral" id="rec" style="margin-top:10px">🎤 Nhấn để trả lời (nói)</button><p class="muted" style="text-align:center;margin-top:6px;font-size:.8rem">Câu này cần trả lời bằng <b>giọng nói</b>.</p>`:`<p class="muted" style="margin-top:10px;font-size:.84rem;text-align:center">🎤 Câu này cần trả lời bằng <b>giọng nói</b>. Thiết bị hiện không thu được âm — hãy mở bằng <b>Chrome trên máy tính</b> rồi cho phép micro.</p>`}`;
-    $('#again').onclick=()=>speakZh(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
-    const rec=$('#rec'); if(rec)rec.onclick=()=>startRec(q);
+    const canSpeak=SR||AI_BASE;
+    box.innerHTML=`${tools}${canSpeak?`<button class="btn block coral" id="rec" style="margin-top:10px">🎤 Nhấn để trả lời (nói)</button><p class="muted" style="text-align:center;margin-top:6px;font-size:.8rem">Câu này cần trả lời bằng <b>giọng nói</b>.</p>`:`<p class="muted" style="margin-top:10px;font-size:.84rem;text-align:center">🎤 Câu này cần trả lời bằng <b>giọng nói</b>. Thiết bị hiện không thu được âm — hãy mở bằng <b>Chrome trên máy tính</b> rồi cho phép micro.</p>`}`;
+    $('#again').onclick=()=>aiSpeak(q.zh); $('#slow').onclick=()=>speakZh(q.zh,0.6); $('#dunno').onclick=showKeyword;
+    const rec=$('#rec'); if(rec)rec.onclick=()=>AI_BASE?aiRecord(q):startRec(q);
+  }
+  async function aiRecord(q){
+    const btn=$('#rec');
+    if(STATE._mr && STATE._mr.state==='recording'){ try{STATE._mr.stop();}catch(e){} return; }
+    let stream; try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ const fb=$('#feedback'); if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">🎤 Không truy cập được micro. Hãy cho phép micro, hoặc mở bằng Chrome.</div>'; return; }
+    let mr; try{ mr=new MediaRecorder(stream); }catch(e){ stream.getTracks().forEach(t=>t.stop()); return startRec(q); }
+    STATE._mr=mr; const chunks=[];
+    mr.ondataavailable=e=>{ if(e.data&&e.data.size)chunks.push(e.data); };
+    mr.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); liveSetState(''); if(STATE._recTimer){clearTimeout(STATE._recTimer);STATE._recTimer=null;}
+      if(btn){btn.textContent='🎤 Nhấn để trả lời (nói)';btn.disabled=false;}
+      const fb=$('#feedback'); if(fb)fb.innerHTML='<p class="muted" style="font-size:.85rem">⏳ Đang nhận dạng giọng nói…</p>';
+      try{ const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'}); const fd=new FormData(); fd.append('file',blob,'a.webm');
+        const r=await fetch(AI_BASE.replace(/\/$/,'')+'/stt',{method:'POST',body:fd}); const d=await r.json(); const txt=(d.text||'').trim();
+        if(!txt){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Chưa nghe rõ, thử nói lại nhé.</div>'; return; }
+        evaluate(q,txt);
+      }catch(e){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Lỗi nhận dạng, thử lại.</div>'; }
+    };
+    mr.start(); liveSetState('recording'); partsCol(STATE.code).doc(STATE.sid).update({state:'speaking'}).catch(()=>{});
+    if(btn){btn.textContent='⏹ Đang ghi… nhấn để dừng & gửi';}
+    STATE._recTimer=setTimeout(()=>{ try{ if(mr.state==='recording')mr.stop(); }catch(e){} },60000);
   }
   function showKeyword(){
     const w=(room.targetWords||[])[0]; if(!w)return toast('Không có từ khoá');
     const box=$('#feedback'); if(box)box.innerHTML=`<div class="soft" style="padding:10px"><b style="font-size:1.1rem">${esc(w.hanzi)}</b> <span class="muted">${esc(w.pinyin)}</span> — ${esc(w.vi)}</div>`;
-    speakZh(w.hanzi);
+    aiSpeak(w.hanzi);
   }
   function startRec(q){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR)return;
@@ -412,12 +436,20 @@ function pageClassroom(){
     try{ rec.start(); }catch(e){ if(btn){btn.textContent='🎤 Nhấn để trả lời';btn.disabled=false;} }
   }
   async function evaluate(q,transcript){
-    const tgt=(room.targetWords||[]); const usedW=tgt.find(w=>transcript.includes(w.hanzi)); const used=!!usedW;
-    const correct=transcript.trim().length>=2; const score=correct?(used?10:7):4;
-    const feedback=used?`回答得很好！你使用了「${usedW.hanzi}」，而且表达很自然。`:correct?'很好！下次试着用上目标词语。':'再试一次，说一句完整的话。';
+    const tgt=(room.targetWords||[]);
+    let used=null,correct=null,score=null,feedback='',reply='';
+    if(AI_BASE){
+      const fb=$('#feedback'); if(fb)fb.innerHTML='<p class="muted" style="font-size:.85rem">⏳ AI đang chấm…</p>';
+      try{
+        const r=await fetch(AI_BASE.replace(/\/$/,'')+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q.zh,answer:transcript,targets:tgt.map(w=>w.hanzi)})});
+        const d=await r.json();
+        if(typeof d.score==='number'){ score=Math.max(0,Math.min(10,Math.round(d.score))); correct=!!d.correct; used=!!d.usedTarget; feedback=d.feedback||''; reply=d.reply_zh||feedback; }
+      }catch(e){}
+    }
+    if(score===null){ const usedW=tgt.find(w=>transcript.includes(w.hanzi)); used=!!usedW; correct=transcript.trim().length>=2; score=correct?(used?10:7):4; feedback=used?`回答得很好！你使用了「${usedW.hanzi}」，而且表达很自然。`:correct?'很好！下次试着用上目标词语。':'再试一次，说一句完整的话。'; reply=feedback; }
     const box=$('#feedback'); if(box)box.innerHTML=`<div class="soft" style="padding:12px"><div class="muted" style="font-size:.85rem">Bạn nói: ${esc(transcript)}</div><div style="margin-top:6px">✅ ${esc(feedback)}</div><div style="margin-top:6px"><span class="pill jade">⭐ +${score} điểm</span></div></div>`;
     liveSetState(''); liveBadge('⭐ +'+score); setTimeout(()=>liveBadge(''),3200);
-    setTimeout(()=>speakZh(feedback),200);
+    setTimeout(()=>aiSpeak(reply),200);
     try{ await turnsCol(STATE.code).add({uid:STATE.sid,name:(ME&&ME.name)||'',qIndex:room.curIndex,qzh:q.zh,transcript,score,correct,usedTarget:used,feedback,at:now()}); }catch(e){}
     try{ await partsCol(STATE.code).doc(STATE.sid).update({state:'answered',answered:firebase.firestore.FieldValue.increment(1)}); }catch(e){}
   }
@@ -1459,6 +1491,9 @@ function liveCleanup(){
   if(LIVE_TIMER){ clearInterval(LIVE_TIMER); LIVE_TIMER=null; }
   try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
   if(STATE._rec){ try{STATE._rec.abort();}catch(e){} STATE._rec=null; }
+  if(STATE._audio){ try{STATE._audio.pause();}catch(e){} STATE._audio=null; }
+  if(STATE._mr){ try{ if(STATE._mr.state==='recording')STATE._mr.stop(); }catch(e){} STATE._mr=null; }
+  if(STATE._recTimer){ clearTimeout(STATE._recTimer); STATE._recTimer=null; }
 }
 function speakZh(text,rate){
   if(!('speechSynthesis' in window)||!text) return;
@@ -1484,6 +1519,15 @@ function liveStage(qzh,opts){ opts=opts||{};
 }
 function liveSetState(s){ const el=document.getElementById('stage'); if(!el)return; el.classList.remove('speaking','recording','praise'); if(s)el.classList.add(s); }
 function liveBadge(txt){ const b=document.getElementById('livebadge'); if(!b)return; b.textContent=txt||''; b.classList.toggle('show',!!txt); }
+function aiSpeak(text,rate){
+  if(!text)return;
+  if(!AI_BASE){ speakZh(text,rate); return; }
+  liveSetState('speaking');
+  fetch(AI_BASE.replace(/\/$/,'')+'/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})
+    .then(r=>r.ok?r.blob():Promise.reject())
+    .then(b=>{ try{ if(STATE._audio)STATE._audio.pause(); }catch(e){} const a=new Audio(URL.createObjectURL(b)); STATE._audio=a; a.onended=()=>{ const el=document.getElementById('stage'); if(el&&el.classList.contains('speaking'))liveSetState(''); }; a.play().catch(()=>speakZh(text,rate)); })
+    .catch(()=>speakZh(text,rate));
+}
 function fmtClock(sec){ sec=Math.max(0,Math.floor(sec)); const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60; const p=n=>String(n).padStart(2,'0'); return (h?p(h)+':':'')+p(m)+':'+p(s); }
 function liveSetup(){
   ensureLiveCss();
@@ -1565,7 +1609,7 @@ function liveTeacherConsole(){
           <div style="margin-top:6px">${wcArr.map(x=>`<div class="kv"><span>${esc(x.h)}</span><b>${x.n} lần</b></div>`).join('')||'<span class="muted">—</span>'}</div>
         </aside>
       </div></div>`);
-    $('#end').onclick=endLive; $('#say').onclick=()=>speakZh(cur.zh);
+    $('#end').onclick=endLive; $('#say').onclick=()=>aiSpeak(cur.zh);
     $('#prev').onclick=()=>setIdx(room.curIndex-1); $('#next').onclick=()=>setIdx(room.curIndex+1);
     root.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>liveRef(STATE.code).update({phaseIndex:+b.dataset.ph}).catch(()=>{}));
   }
