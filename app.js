@@ -419,14 +419,17 @@ function pageClassroom(){
     mr.ondataavailable=e=>{ if(e.data&&e.data.size)chunks.push(e.data); };
     mr.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); liveSetState(''); if(STATE._recTimer){clearTimeout(STATE._recTimer);STATE._recTimer=null;}
       if(btn){btn.textContent='🎤 Nhấn để trả lời (nói)';btn.disabled=false;}
-      const fb=$('#feedback'); if(fb)fb.innerHTML='<p class="muted" style="font-size:.85rem">⏳ Đang nhận dạng giọng nói…</p>';
+      const fb=$('#feedback'); if(fb)fb.innerHTML='<p class="muted" style="font-size:.85rem">⏳ Đang gửi & nhận dạng giọng nói…</p>';
       try{ let blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'}); let fname='a.wav';
         try{ blob=await blobToWav(blob); }catch(e){ fname='a.webm'; }
+        const kb=Math.round(blob.size/1024);
         const fd=new FormData(); fd.append('file',blob,fname);
-        const r=await fetch(AI_BASE.replace(/\/$/,'')+'/stt',{method:'POST',body:fd}); const d=await r.json(); const txt=(d.text||'').trim();
-        if(!txt){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Chưa nghe rõ, nói to & rõ hơn rồi thử lại nhé.</div>'; return; }
+        const r=await fetch(AI_BASE.replace(/\/$/,'')+'/stt',{method:'POST',body:fd});
+        if(!r.ok){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.8rem">⚠️ Máy chủ nhận giọng lỗi HTTP '+r.status+' (âm '+kb+'KB). Thử lại.</div>'; return; }
+        const d=await r.json(); const txt=(d.text||'').trim();
+        if(!txt){ const dbg=d.raw?esc(JSON.stringify(d.raw)).slice(0,300):'(rỗng)'; if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.76rem">⚠️ Chưa nhận ra lời (âm '+kb+'KB). Máy chủ trả: '+dbg+'</div>'; return; }
         evaluate(q,txt);
-      }catch(e){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Lỗi nhận dạng, thử lại.</div>'; }
+      }catch(e){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.8rem">⚠️ Lỗi: '+esc(String(e&&e.message||e)).slice(0,160)+'</div>'; }
     };
     mr.start(); liveSetState('recording'); partsCol(STATE.code).doc(STATE.sid).update({state:'speaking'}).catch(()=>{});
     if(btn){btn.textContent='⏹ Đang ghi… nhấn để dừng & gửi';}
