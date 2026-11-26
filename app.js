@@ -900,9 +900,31 @@ const TC_CSS=`<style>
 .tc-top h2{margin:0;font-family:'Baloo 2'}
 .tc-ctx{background:#eef0ff;color:#4b43c4;padding:6px 12px;border-radius:999px;font-weight:700;font-size:.85rem;white-space:nowrap}
 .dotc{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.tc-tabs{display:flex;gap:2px;border-bottom:1px solid #eef2f7;margin:0 0 14px;flex-wrap:wrap}
+.tc-tab{background:none;border:none;padding:8px 13px;font-weight:700;color:#8aa0b2;cursor:pointer;border-bottom:2px solid transparent;font-size:.88rem}
+.tc-tab.on{color:#4b43c4;border-bottom-color:#4b43c4}
+.tc-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tc-filters select,.tc-filters input{padding:7px 10px;border:1px solid #e2e8f1;border-radius:9px;font:inherit;background:var(--card,#fff);color:inherit}
+.tc-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.tc-head h3{margin:0;font-family:'Baloo 2';font-size:1.25rem}
+.pbar{height:7px;background:#eef3f9;border-radius:5px;overflow:hidden;min-width:64px}
+.pbar>span{display:block;height:100%;background:#6d5cf0;border-radius:5px}
+.pbar.pg>span{background:#23b386}.pbar.py>span{background:#f0a500}.pbar.pr>span{background:#e5484d}
+.barcell{display:flex;align-items:center;gap:8px}.barcell .pbar{flex:1}
+.chip{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}
+.chip.g{background:#e3f6ee;color:#17805a}.chip.y{background:#fdf1d6;color:#9a6a00}.chip.r{background:#fde8e8;color:#c0362f}.chip.b{background:#e7ecfb;color:#3a46b0}.chip.n{background:#eef2f7;color:#5b6b7b}
+.avatarc{width:30px;height:30px;border-radius:50%;background:#e7ecfb;color:#3a46b0;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;flex:0 0 30px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f0f3f8;font-size:.88rem}
+.kv:last-child{border-bottom:none}.kv b{text-align:right}
+.dcard{border:1px dashed #cdd6e4!important}
+.bubble{max-width:82%;padding:8px 11px;border-radius:12px;font-size:.88rem;line-height:1.5;margin:6px 0}
+.bubble.ai{background:#f1f5fb;border-bottom-left-radius:3px}
+.bubble.hs{background:#eef0ff;margin-left:auto;border-bottom-right-radius:3px}
+.critbar{display:grid;grid-template-columns:120px 1fr 38px;gap:8px;align-items:center;margin:7px 0;font-size:.85rem}
+.sk{background:linear-gradient(90deg,#f0f3f8,#e7edf4,#f0f3f8);border-radius:6px;color:transparent;user-select:none}
 @media(max-width:760px){.tconsole{flex-direction:column;padding:8px}.tc-side{width:auto;flex:none;position:static;display:flex;gap:6px;overflow-x:auto;padding:8px}.tc-brand{display:none}.tc-nav{white-space:nowrap;width:auto}}
 </style>`;
-const TC_NAV=[['overview','📊','Tổng quan'],['live','🎥','Lớp trực tuyến'],['students','👥','Quản lý học viên'],['vocab','📖','Phân tích từ vựng'],['convo','💬','Lịch sử hội thoại AI'],['report','📋','Báo cáo buổi học'],['tests','📝','Kiểm tra & đánh giá'],['progress','📈','Phân tích tiến bộ'],['settings','⚙️','Cài đặt lớp']];
+const TC_NAV=[['overview','📊','Tổng quan'],['classes','🏫','Quản lý lớp học'],['students','👥','Học viên'],['vocab','📖','Phân tích từ vựng'],['convo','💬','Lịch sử hội thoại AI'],['report','📋','Báo cáo buổi học'],['tests','📝','Kiểm tra & đánh giá'],['progress','📈','Phân tích tiến bộ'],['settings','⚙️','Cài đặt']];
 function viewTeacher(screen){
   screen=screen||STATE.tcScreen||'overview'; STATE.tcScreen=screen;
   render(`${TC_CSS}<div class="tconsole">
@@ -920,22 +942,35 @@ function viewTeacher(screen){
   tcRoute(screen);
 }
 function tcRoute(s){
-  const meta={overview:['Bảng điều khiển giáo viên','Theo dõi & đánh giá quá trình học từ vựng của học viên'],live:['Lớp học trực tuyến','Buổi học Live luyện nghe–nói với AI'],students:['Quản lý học viên','Danh sách & hồ sơ từng học viên'],vocab:['Phân tích từ vựng','Tình trạng từ vựng của cả lớp'],convo:['Lịch sử hội thoại AI','Transcript & phân tích các buổi luyện nói'],report:['Báo cáo buổi học','Tổng kết từng buổi Live'],tests:['Kiểm tra & đánh giá','Bài kiểm tra & ngân hàng câu hỏi'],progress:['Phân tích tiến bộ','Xu hướng kết quả theo thời gian'],settings:['Cài đặt lớp học','Thông tin lớp']};
+  const meta={overview:['Bảng điều khiển giáo viên','Theo dõi & đánh giá quá trình học từ vựng của học viên'],classes:['Quản lý lớp học','Danh sách lớp, lịch học & tài liệu'],students:['Học viên','Danh sách & hồ sơ từng học viên'],vocab:['Phân tích từ vựng','Tình trạng từ vựng của cả lớp'],convo:['Lịch sử hội thoại AI','Transcript & phân tích các buổi luyện nói'],report:['Báo cáo buổi học','Tổng kết từng buổi Live'],tests:['Kiểm tra & đánh giá','Bài kiểm tra & ngân hàng câu hỏi'],progress:['Phân tích tiến bộ','Xu hướng kết quả theo thời gian'],settings:['Cài đặt','Thông tin lớp học']};
   const t=$('#tc-title'),sub=$('#tc-sub'); if(t)t.textContent=(meta[s]||['',''])[0]; if(sub)sub.textContent=(meta[s]||['',''])[1];
   const body=$('#panel');
   if(s==='overview')return tcOverview(body);
+  if(s==='classes')return tcClasses(body);
   if(s==='students')return teacherDash();
   if(s==='vocab')return tcVocab(body);
+  if(s==='convo')return tcConvo(body);
+  if(s==='report')return tcReport(body);
+  if(s==='tests')return tcTests(body);
+  if(s==='progress')return tcProgress(body);
   if(s==='settings')return tcSettings(body);
-  const shells={
-    live:['🎥','Lớp học trực tuyến (Live)','Khu vực buổi học Live nghe–nói với AI. Cần hệ AI Speaking Tutor (STT/LLM/TTS) — giao diện sẽ hoạt động khi backend AI được triển khai. Dữ liệu buổi Live sẽ tự ghi vào đây.'],
-    convo:['💬','Lịch sử hội thoại AI','Transcript từng lượt nói + phân tích của AI sẽ hiện ở đây sau khi học sinh luyện nói với AI.'],
-    report:['📋','Báo cáo buổi học','Báo cáo tổng kết mỗi buổi Live (tỷ lệ đúng, vận dụng từ, nhận xét) — hiện khi có buổi Live.'],
-    tests:['📝','Kiểm tra & đánh giá','Tạo bài kiểm tra & ngân hàng câu hỏi. Sẽ bổ sung ở giai đoạn sau.'],
-    progress:['📈','Phân tích tiến bộ','Xu hướng độ đúng/vận dụng theo thời gian — cần tích lũy nhiều buổi học.']};
-  if(shells[s])return tcShell(body,shells[s][0],shells[s][1],shells[s][2]);
   body.innerHTML='<p class="muted">—</p>';
 }
+async function classData(force){
+  if(!force && STATE._rowsCode===STATE.code && STATE._rows) return STATE._rows;
+  const d=await loadClassRows(); STATE._rows=d; STATE._rowsCode=STATE.code; return d;
+}
+function classAgg(rows){
+  const curr=(typeof ALLWORDS!=='undefined'?ALLWORDS.length:0);
+  const n=rows.length;
+  const avgAcc=n?Math.round(rows.reduce((a,r)=>a+r.acc,0)/n):0;
+  const totTime=rows.reduce((a,r)=>a+r.time,0);
+  const totSess=rows.reduce((a,r)=>a+(r.sessions||0),0);
+  const avgProg=(curr&&n)?Math.round(rows.reduce((a,r)=>a+Math.min(r.learned,curr)/curr,0)/n*100):0;
+  const classBk=rows.reduce((o,r)=>({g:o.g+r.bk.g,b:o.b+r.bk.b,a:o.a+r.bk.a,wt:o.wt+r.bk.wt,total:o.total+r.bk.total}),{g:0,b:0,a:0,wt:0,total:0});
+  return {curr,n,avgAcc,totTime,totSess,avgProg,classBk};
+}
+function pctOf(v,t){ return t?Math.round(v/t*100):0; }
 function tcShell(body,ic,title,desc){
   body.innerHTML=`<div class="soft" style="padding:40px 20px;text-align:center"><div style="font-size:2.4rem">${ic}</div><h3 style="margin:8px 0">${esc(title)}</h3><p class="muted" style="max-width:480px;margin:0 auto;line-height:1.6">${esc(desc)}</p><p style="margin-top:14px"><span class="pill">⏳ Sắp ra mắt</span></p></div>`;
 }
@@ -1042,32 +1077,77 @@ async function tcOverview(body){
     <div class="soft" style="padding:14px"><div class="spread"><b>📈 Phân tích tiến bộ</b><button class="linklike" id="toProg">→</button></div>${linePts.length>=2?lineChart(linePts):'<p class="muted" style="margin-top:10px">Cần ≥2 buổi học để thấy xu hướng tiến bộ.</p>'}</div>
   </div>`;
   const on=(id,s)=>{const b=$(id);if(b)b.onclick=()=>viewTeacher(s);};
-  on('#toLive','live');on('#toStu2','students');on('#toVocab','vocab');on('#toReport','report');on('#toTests','tests');on('#toProg','progress');
+  on('#toLive','report');on('#toStu2','students');on('#toVocab','vocab');on('#toReport','report');on('#toTests','tests');on('#toProg','progress');
+}
+function bucketsForIds(rows, ids){
+  let g=0,b=0,a=0,wt=0;
+  rows.forEach(r=>{ ids.forEach(id=>{ const c=r.cardMap[id];
+    if(!c){wt++;return;}
+    if((c.mastery||0)>=5)g++;
+    else if((c.wrong||0)>(c.correct||0))a++;
+    else if((c.mastery||0)>=1)b++;
+    else wt++;
+  });});
+  return {g,b,a,wt,total:g+b+a+wt};
+}
+function vocLegend(bk){
+  const t=bk.total||1;
+  return `<div style="font-size:.86rem;line-height:2.1">
+    <div class="spread"><span><span class="dotc" style="background:#23b386"></span>Vận dụng tốt</span><b>${pctOf(bk.g,t)}% (${bk.g})</b></div>
+    <div class="spread"><span><span class="dotc" style="background:#2f9fd6"></span>Đã nhận biết</span><b>${pctOf(bk.b,t)}% (${bk.b})</b></div>
+    <div class="spread"><span><span class="dotc" style="background:#f0a500"></span>Chưa vững</span><b>${pctOf(bk.a,t)}% (${bk.a})</b></div>
+    <div class="spread"><span><span class="dotc" style="background:#e5484d"></span>Chưa ghi nhớ</span><b>${pctOf(bk.wt,t)}% (${bk.wt})</b></div>
+  </div>`;
 }
 async function tcVocab(body){
   body.innerHTML='<p class="muted">Đang phân tích từ vựng…</p>';
-  let data; try{ data=await loadClassRows(); }catch(e){ body.innerHTML='<p class="muted">Lỗi tải dữ liệu.</p>'; return; }
+  let data; try{ data=await classData(); }catch(e){ body.innerHTML='<p class="muted">Lỗi tải dữ liệu.</p>'; return; }
   const {rows,classWeak,WM}=data;
   const curr=(typeof ALLWORDS!=='undefined'?ALLWORDS.length:0);
-  if(!rows.length){ body.innerHTML='<div class="soft" style="padding:30px;text-align:center"><p class="muted">Chưa có dữ liệu học — số liệu từ vựng sẽ hiện khi học sinh bắt đầu học.</p></div>'; return; }
-  const classBk=rows.reduce((o,r)=>({g:o.g+r.bk.g,b:o.b+r.bk.b,a:o.a+r.bk.a,wt:o.wt+r.bk.wt,total:o.total+r.bk.total}),{g:0,b:0,a:0,wt:0,total:0});
-  const hard=Object.keys(classWeak).map(id=>({w:WM[id],n:classWeak[id]})).filter(x=>x.w).sort((a,b)=>b.n-a.n).slice(0,20);
-  body.innerHTML=`
-   <div class="grid" style="grid-template-columns:1fr 1.4fr;gap:14px">
-     <div class="soft" style="padding:14px"><b>🫧 Phân bố trạng thái từ (toàn lớp)</b>
-       <div style="display:flex;gap:16px;align-items:center;margin-top:10px;flex-wrap:wrap">${donutSvg(classBk)}
-       <div style="font-size:.86rem;line-height:2">
-         <div><span class="dotc" style="background:#23b386"></span>Vận dụng tốt <b>${classBk.g}</b></div>
-         <div><span class="dotc" style="background:#2f9fd6"></span>Đã nhận biết <b>${classBk.b}</b></div>
-         <div><span class="dotc" style="background:#f0a500"></span>Chưa vững <b>${classBk.a}</b></div>
-         <div><span class="dotc" style="background:#e5484d"></span>Chưa ghi nhớ <b>${classBk.wt}</b></div>
-       </div></div>
-       <p class="muted" style="margin-top:10px;font-size:.84rem">Giáo trình: <b>${curr}</b> từ · ${rows.length} học viên.</p></div>
-     <div class="soft" style="padding:14px"><b>⚠️ Từ cả lớp hay sai nhất</b>${hard.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ</th><th>Pinyin</th><th>Nghĩa</th><th>Số em sai</th></tr></thead><tbody>${hard.map(h=>`<tr><td style="font-size:1.1rem">${esc(h.w.hanzi)}</td><td class="muted">${esc(h.w.pinyin)}</td><td>${esc(h.w.vi)}</td><td><b>${h.n}</b></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ nào bị sai nổi bật. 👍</p>'}</div>
-   </div>
-   <div class="soft" style="padding:14px;margin-top:14px"><b>📚 Nội dung từ vựng theo bài</b><div id="lesbox" style="margin-top:8px"></div></div>`;
-  const lb=$('#lesbox');
-  if(lb && typeof LESSONS!=='undefined'){ lb.innerHTML=LESSONS.map(l=>`<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600">${esc(l.title)} <span class="muted">(${l.words.length} từ)</span></summary><div class="tbl-wrap" style="margin-top:6px"><table><tbody>${l.words.map(w=>`<tr><td style="font-size:1.05rem">${esc(w.hanzi)}</td><td class="muted">${esc(w.pinyin)}</td><td>${esc(w.vi)}</td></tr>`).join('')}</tbody></table></div></details>`).join(''); }
+  const lessons=(typeof LESSONS!=='undefined'?LESSONS:[]);
+  const wa={}; rows.forEach(r=>r.cards.forEach(c=>{const x=wa[c.wid]||(wa[c.wid]={cr:0,wr:0});x.cr+=(c.correct||0);x.wr+=(c.wrong||0);}));
+  const waPct=id=>{const x=wa[id]||{cr:0,wr:0};const t=x.cr+x.wr;return t?Math.round(x.cr/t*100):null;};
+  const allIds=(typeof ALLWORDS!=='undefined'?ALLWORDS.map(w=>w.id):[]);
+  let tab='tq', lesId='all';
+  const empty=!rows.length;
+  function weakRows(ids){
+    const set=ids?new Set(ids):null;
+    return Object.keys(classWeak).map(id=>({w:WM[id],n:classWeak[id],pct:waPct(id)}))
+      .filter(x=>x.w && (!set||set.has(x.w.id))).sort((a,b)=>b.n-a.n);
+  }
+  function wbar(pct){ const cls=pct==null?'':pct>=75?'pg':pct>=50?'py':'pr'; return `<div class="barcell"><div class="pbar ${cls}"><span style="width:${pct==null?0:pct}%"></span></div><span>${pct==null?'—':pct+'%'}</span></div>`; }
+  function render(){
+    const ids=lesId==='all'?allIds:(lessons.find(l=>l.id===lesId)||{words:[]}).words.map(w=>w.id);
+    const bk=lesId==='all'?classAgg(rows).classBk:bucketsForIds(rows,ids);
+    const centerN=lesId==='all'?curr:ids.length;
+    const lesSel=`<select id="vles"><option value="all">Toàn giáo trình</option>${lessons.map(l=>`<option value="${l.id}" ${l.id===lesId?'selected':''}>${esc(l.title)}</option>`).join('')}</select>`;
+    let html=`<div class="tc-head"><div class="tc-filters">${lesSel}<span class="chip b">Toàn lớp · ${rows.length} HV</span></div></div>
+      <div class="tc-tabs">
+        ${[['tq','Tổng quan'],['bai','Theo bài học'],['hv','Theo học viên'],['on','Từ cần ôn tập']].map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}
+      </div><div id="vbody"></div>`;
+    body.innerHTML=html;
+    body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
+    const vl=$('#vles')||$('#vles'); if(vl)vl.onchange=()=>{lesId=vl.value;render();};
+    const vb=$('#vbody');
+    if(empty){ vb.innerHTML='<div class="soft" style="padding:28px;text-align:center"><p class="muted">Chưa có dữ liệu học — số liệu từ vựng sẽ tự hiện khi học sinh bắt đầu học. Cấu trúc phân tích đã sẵn sàng.</p></div>'; return; }
+    if(tab==='tq'){
+      const hw=weakRows(lesId==='all'?null:ids).slice(0,8);
+      vb.innerHTML=`<div class="grid" style="grid-template-columns:1fr 1.25fr;gap:14px">
+        <div class="soft" style="padding:16px"><b>🫧 Mức độ nắm vững (lượt từ · toàn lớp)</b>
+          <div style="display:flex;gap:18px;align-items:center;margin-top:12px;flex-wrap:wrap">
+            <div style="position:relative;width:126px;height:126px">${donutSvg(bk)}<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><b style="font-size:1.3rem;font-family:'Baloo 2'">${centerN}</b><small class="muted">từ vựng</small></div></div>
+            <div style="flex:1;min-width:150px">${vocLegend(bk)}</div></div></div>
+        <div class="soft" style="padding:16px"><b>⚠️ Từ vựng cần ôn tập nhiều nhất</b>${hw.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ vựng</th><th>Nghĩa</th><th>Tỷ lệ dùng đúng</th></tr></thead><tbody>${hw.map(h=>`<tr><td style="font-size:1.1rem">${esc(h.w.hanzi)} <small class="muted" style="font-size:.72rem">${esc(h.w.pinyin)}</small></td><td>${esc(h.w.vi)}</td><td>${wbar(h.pct)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ nào bị sai nổi bật. 👍</p>'}</div></div>`;
+    } else if(tab==='bai'){
+      vb.innerHTML=lessons.length?lessons.map(l=>{const lb=bucketsForIds(rows,l.words.map(w=>w.id));return `<div class="soft" style="padding:14px;margin-bottom:10px"><div class="spread"><b>${esc(l.title)}</b><span class="pill">${l.words.length} từ · nắm vững ${pctOf(lb.g,lb.total)}%</span></div>${statusBar(lb)}<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600;font-size:.86rem;color:#4b43c4">Xem danh sách từ</summary><div class="tbl-wrap" style="margin-top:6px"><table><tbody>${l.words.map(w=>`<tr><td style="font-size:1.05rem">${esc(w.hanzi)}</td><td class="muted">${esc(w.pinyin)}</td><td>${esc(w.vi)}</td><td style="width:120px">${wbar(waPct(w.id))}</td></tr>`).join('')}</tbody></table></div></details></div>`;}).join(''):'<p class="muted">Chưa nạp danh sách bài.</p>';
+    } else if(tab==='hv'){
+      vb.innerHTML=`<div class="soft" style="padding:12px"><div class="tbl-wrap"><table><thead><tr><th>Học viên</th><th>Vận dụng tốt</th><th>Đã nhận biết</th><th>Chưa vững</th><th>Chưa ghi nhớ</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td><span class="chip g">${r.bk.g}</span></td><td><span class="chip b">${r.bk.b}</span></td><td><span class="chip y">${r.bk.a}</span></td><td><span class="chip n">${r.bk.wt}</span></td></tr>`).join('')}</tbody></table></div></div>`;
+    } else {
+      const wr=weakRows(lesId==='all'?null:ids);
+      vb.innerHTML=`<div class="soft" style="padding:12px"><b>Từ cần ôn tập (${wr.length})</b>${wr.length?`<div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Từ</th><th>Pinyin</th><th>Nghĩa</th><th>Số em sai</th><th>Tỷ lệ đúng</th></tr></thead><tbody>${wr.map(h=>`<tr><td style="font-size:1.1rem">${esc(h.w.hanzi)}</td><td class="muted">${esc(h.w.pinyin)}</td><td>${esc(h.w.vi)}</td><td><b>${h.n}</b></td><td style="width:130px">${wbar(h.pct)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted" style="margin-top:8px">Chưa có từ cần ôn nổi bật. 👍</p>'}</div>`;
+    }
+  }
+  render();
 }
 function tcSettings(body){
   const c=STATE.cls||{};
@@ -1081,6 +1161,126 @@ function tcSettings(body){
     <p class="muted" style="margin-top:10px;font-size:.85rem">Chia sẻ <b>mã lớp</b> cho học sinh để các em đăng ký vào lớp.</p>
     <p style="margin-top:12px"><button class="linklike" id="home">← Về danh sách lớp</button></p></div>`;
   const h=$('#home'); if(h)h.onclick=viewTeacherHome;
+}
+async function tcClasses(body){
+  body.innerHTML='<p class="muted">Đang tải danh sách lớp…</p>';
+  let tab='list', classes=[];
+  try{ const q=await db.collection('classes').where('teacherUid','==',auth.currentUser.uid).get(); classes=q.docs.map(d=>({id:d.id,...d.data()})); }
+  catch(e){ body.innerHTML='<p class="muted">Lỗi tải lớp.</p>'; return; }
+  for(const c of classes){ try{ c._n=(await stuCol(c.id).get()).size; }catch(e){ c._n='—'; } }
+  let agg=null; try{ agg=classAgg((await classData()).rows); }catch(e){}
+  const cur=classes.find(c=>c.id===STATE.code)||classes[0]||{};
+  function render(){
+    const tabs=[['list','Danh sách lớp'],['sched','Lịch học'],['assign','Phân công'],['mat','Tài liệu lớp']];
+    const trs=classes.map(c=>`<tr><td><b>Lớp ${esc(c.code)}</b></td><td>${esc(c.level||'')}</td><td>${c._n}</td><td class="muted">—</td><td><span class="chip g">Đang học</span></td><td><button class="btn sm go" data-id="${esc(c.id)}" title="Mở lớp">Mở</button></td></tr>`).join('');
+    const other=tab==='sched'?'Lịch học từng lớp — sẽ bổ sung khi cô thiết lập thời khoá biểu.':tab==='assign'?'Phân công giáo viên/trợ giảng — dành cho giai đoạn nhiều lớp.':'Tài liệu & giáo trình của lớp — sắp bổ sung.';
+    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><button class="btn sm" id="mk">+ Tạo lớp học</button></div>
+    <div class="grid" style="grid-template-columns:1.6fr 1fr;gap:14px">
+      <div class="soft" style="padding:10px">${tab==='list'?`<div class="tbl-wrap"><table><thead><tr><th>Tên lớp</th><th>Khóa học</th><th>Số học viên</th><th>Lịch học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${classes.length?trs:`<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">Chưa có lớp nào.</td></tr>`}</tbody></table></div>`:`<div style="padding:28px;text-align:center" class="muted">${other}</div>`}</div>
+      <div class="soft" style="padding:16px"><b>Thông tin lớp: ${esc(cur.code||'—')}</b><div style="margin-top:10px">
+        <div class="kv"><span>Khóa học</span><b>${esc(cur.level||'—')}</b></div>
+        <div class="kv"><span>Số học viên</span><b>${agg?agg.n:(cur._n||'—')}</b></div>
+        <div class="kv"><span>Đã tổ chức</span><b>${agg?agg.totSess+' buổi':'—'}</b></div>
+        <div class="kv"><span>Tổng thời lượng</span><b>${agg?fmtDur(agg.totTime):'—'}</b></div>
+        <div class="kv"><span>Tỷ lệ tham gia TB</span><b>—</b></div>
+        <div class="kv"><span>Ngày tạo</span><b>${cur.createdAt?new Date(cur.createdAt).toISOString().slice(0,10):'—'}</b></div>
+      </div><button class="btn block" id="detail" style="margin-top:12px">Xem chi tiết lớp →</button></div>
+    </div>`;
+    body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
+    const mk=$('#mk'); if(mk)mk.onclick=()=>viewCreateClass(STATE.courseId);
+    const dt=$('#detail'); if(dt)dt.onclick=()=>viewTeacher('students');
+    body.querySelectorAll('.go').forEach(b=>b.onclick=()=>{const c=classes.find(x=>x.id===b.dataset.id);if(!c)return;STATE.code=c.id;STATE.codeShort=c.code;STATE.courseId=c.level;STATE.cls=c;STATE._rows=null;viewTeacher('overview');});
+  }
+  render();
+}
+function tcConvo(body){
+  const demo=(a,b)=>`<div class="bubble ai">${a}</div><div class="bubble hs">${b}</div>`;
+  body.innerHTML=`
+  <div class="soft dcard" style="padding:12px;margin-bottom:12px"><p class="muted" style="margin:0">💬 <b>Lịch sử hội thoại AI</b> — hiển thị từng lượt luyện nói của học viên với AI kèm chấm điểm tự động. Cần hệ <b>AI Speaking Tutor</b> (nhận giọng → AI phản hồi → chấm). Giao diện đã dựng sẵn; khi backend AI hoạt động, mỗi lượt nói + đánh giá sẽ tự lưu vào đây.</p></div>
+  <div class="tc-filters" style="margin-bottom:12px"><select disabled><option>Học viên: (chưa có dữ liệu)</option></select><select disabled><option>Buổi học</option></select><select disabled><option>Loại: Tất cả</option></select></div>
+  <div class="grid" style="grid-template-columns:.9fr 1.3fr 1fr;gap:12px">
+    <div class="soft" style="padding:12px"><b>Danh sách lượt hội thoại</b><div style="margin-top:8px">${[1,2,3,4].map(i=>`<div class="soft" style="padding:8px;margin-bottom:6px"><b class="sk">Lượt ${i}</b><div class="sk" style="margin-top:4px">———————</div></div>`).join('')}</div></div>
+    <div class="soft" style="padding:12px"><b>Chi tiết hội thoại</b><div style="margin-top:8px;opacity:.55">${demo('你周末打算做什么？','我打算去爬山。')}${demo('你为什么喜欢爬山？','因为爬山让我放松。')}</div><p class="muted" style="margin-top:8px;font-size:.8rem">(Nội dung minh hoạ cấu trúc)</p></div>
+    <div class="soft" style="padding:12px"><b>Đánh giá lượt nói</b><div style="margin-top:8px">
+      <div class="kv"><span>Điểm</span><b>—/100</b></div>
+      <div class="kv"><span>Từ vựng</span><b>—</b></div>
+      <div class="kv"><span>Ngữ pháp</span><b>—</b></div>
+      <div class="kv"><span>Phản hồi</span><b>—</b></div>
+      <div class="kv"><span>Phát âm</span><b>—</b></div>
+      <div class="kv"><span>Lưu loát</span><b>—</b></div>
+    </div><div class="soft dcard" style="padding:10px;margin-top:10px"><b>Phân tích & nhận xét AI</b><p class="muted" style="margin:6px 0 0;font-size:.84rem">Nhận xét tự động về cách dùng từ, ngữ pháp và gợi ý mở rộng câu sẽ hiện ở đây.</p></div></div>
+  </div>`;
+}
+async function tcReport(body){
+  body.innerHTML='<p class="muted">Đang tải…</p>';
+  let agg=null; try{ agg=classAgg((await classData()).rows); }catch(e){}
+  const crit=[['Độ chính xác (tỷ lệ đúng)',agg?agg.avgAcc:null],['Vận dụng từ đã học',null],['Ngữ pháp',null],['Phản hồi hội thoại',null],['Hoàn thành nhiệm vụ',null]];
+  const bar=(l,v)=>`<div class="critbar"><span>${l}</span><div class="pbar ${v==null?'':v>=75?'pg':v>=50?'py':'pr'}"><span style="width:${v==null?0:v}%"></span></div><span>${v==null?'—':v+'%'}</span></div>`;
+  body.innerHTML=`
+  <div class="soft dcard" style="padding:12px;margin-bottom:12px"><p class="muted" style="margin:0">📋 Báo cáo tổng kết <b>mỗi buổi học Live</b>. Các chỉ số buổi Live (thời lượng, tham gia, vận dụng từ, nhận xét AI) sẽ tự tạo khi có buổi Live với AI. Chỉ số tỷ lệ đúng dưới đây lấy từ dữ liệu tự luyện thật.</p></div>
+  <div class="tc-head"><h3>Báo cáo lớp học Live</h3><div class="tc-filters"><select disabled><option>Lớp ${esc(STATE.codeShort||STATE.code)}</option></select><select disabled><option>Chọn buổi (chưa có)</option></select></div></div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+    <div class="stat"><b>—</b><span>THỜI LƯỢNG</span></div>
+    <div class="stat"><b>${agg&&agg.n?agg.n+'/'+agg.n:'—'}</b><span>THAM GIA</span></div>
+    <div class="stat"><b>${agg?agg.avgAcc+'%':'—'}</b><span>TỶ LỆ ĐÚNG</span></div>
+    <div class="stat"><b>—</b><span>VẬN DỤNG TỪ</span></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1.3fr 1fr;gap:14px;margin-top:14px">
+    <div class="soft" style="padding:16px"><b>Kết quả theo tiêu chí (toàn lớp)</b><div style="margin-top:10px">${crit.map(([l,v])=>bar(l,v)).join('')}</div></div>
+    <div class="soft" style="padding:16px"><b>✨ Nhận xét & đề xuất AI</b><p class="muted" style="margin-top:8px;font-size:.86rem">Nhận xét tổng hợp của AI về buổi học (điểm mạnh, lỗi thường gặp, từ cần ôn, đề xuất bài sau) sẽ hiện sau mỗi buổi Live.</p><button class="btn block" id="toStu" style="margin-top:10px">Xem danh sách chi tiết học viên →</button></div>
+  </div>`;
+  const b=$('#toStu'); if(b)b.onclick=()=>viewTeacher('students');
+}
+function tcTests(body){
+  let tab='list';
+  function render(){
+    const tabs=[['list','Bài kiểm tra'],['crit','Đánh giá theo tiêu chí'],['bank','Ngân hàng câu hỏi']];
+    const inner=tab==='list'?`<div class="tbl-wrap"><table><thead><tr><th>Tên bài kiểm tra</th><th>Bài học</th><th>Hình thức</th><th>Số câu</th><th>Đã làm</th><th>Điểm TB</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody><tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Chưa có bài kiểm tra nào.<br>Bấm <b>+ Tạo bài kiểm tra</b> (trắc nghiệm / tự luận / nói với AI). Tính năng đang phát triển — cấu trúc đã sẵn sàng.</td></tr></tbody></table></div>`:tab==='crit'?`<div style="padding:24px;text-align:center" class="muted">Thiết lập thang điểm theo tiêu chí (từ vựng, ngữ pháp, phát âm, phản hồi…) để chấm đồng bộ — sắp ra mắt.</div>`:`<div style="padding:24px;text-align:center" class="muted">Ngân hàng câu hỏi theo bài học để tái sử dụng khi tạo đề — sắp ra mắt.</div>`;
+    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><button class="btn sm" id="mk">+ Tạo bài kiểm tra</button></div><div class="soft" style="padding:10px">${inner}</div>`;
+    body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
+    const mk=$('#mk'); if(mk)mk.onclick=()=>toast('Tính năng tạo bài kiểm tra đang được phát triển');
+  }
+  render();
+}
+async function tcProgress(body){
+  body.innerHTML='<p class="muted">Đang tải…</p>';
+  let data; try{ data=await classData(); }catch(e){ body.innerHTML='<p class="muted">Lỗi tải dữ liệu.</p>'; return; }
+  const {rows}=data; const agg=classAgg(rows);
+  const byDate={}; rows.forEach(r=>r.sess.forEach(s=>{const k=s.startedAt?new Date(s.startedAt).toISOString().slice(0,10):null;const rev=s.reviewed||0;if(!k||!rev)return;byDate[k]=byDate[k]||{rev:0,cr:0};byDate[k].rev+=rev;byDate[k].cr+=(s.correct||0);}));
+  const days=Object.keys(byDate).sort();
+  const linePts=days.map(k=>({y:Math.round(byDate[k].cr/byDate[k].rev*100)}));
+  let dAcc=null;
+  if(days.length>=4){const h=Math.floor(days.length/2);const avg=ks=>{let r=0,c=0;ks.forEach(k=>{r+=byDate[k].rev;c+=byDate[k].cr;});return r?Math.round(c/r*100):0;};dAcc=avg(days.slice(h))-avg(days.slice(0,h));}
+  let tab='chung';
+  function render(){
+    const tabs=[['chung','Tiến bộ chung'],['hv','Theo học viên'],['tv','Theo từ vựng'],['gd','So sánh giai đoạn']];
+    const sign=v=>v==null?'—':(v>0?'+'+v:''+v);
+    let main;
+    if(tab==='chung'){
+      main=`<div class="grid" style="grid-template-columns:1.4fr 1fr;gap:14px">
+        <div class="soft" style="padding:16px"><b>📈 Xu hướng điểm trung bình của lớp</b>${linePts.length>=2?lineChart(linePts):'<p class="muted" style="margin-top:10px">Cần ≥2 buổi học để vẽ xu hướng.</p>'}</div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="soft" style="padding:16px"><b>Mức tiến bộ (so với giai đoạn trước)</b><div style="margin-top:8px">
+            <div class="kv"><span>Tỷ lệ đúng</span><b style="color:${dAcc>0?'#17805a':dAcc<0?'#c0362f':'inherit'}">${sign(dAcc)}${dAcc==null?'':'%'}</b></div>
+            <div class="kv"><span>Số từ vận dụng tốt</span><b>${agg.classBk.g}</b></div>
+          </div></div>
+          <div class="soft" style="padding:16px"><b>Thời gian học tập</b><div style="margin-top:8px">
+            <div class="kv"><span>Tổng thời gian lớp</span><b>${fmtDur(agg.totTime)}</b></div>
+            <div class="kv"><span>TB mỗi học viên</span><b>${agg.n?fmtDur(Math.round(agg.totTime/agg.n)):'—'}</b></div>
+            <div class="kv"><span>Thời gian/buổi TB</span><b>${agg.totSess?fmtDur(Math.round(agg.totTime/agg.totSess)):'—'}</b></div>
+          </div></div>
+        </div></div>`;
+    } else if(tab==='hv'){
+      main=`<div class="soft" style="padding:12px"><div class="tbl-wrap"><table><thead><tr><th>Học viên</th><th>Tỷ lệ đúng</th><th>Từ nắm vững</th><th>Số buổi</th><th>Thời gian</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${r.acc}%</td><td>${r.bk.g}</td><td>${r.sessions}</td><td class="muted">${fmtDur(r.time)}</td></tr>`).join('')}</tbody></table></div></div>`;
+    } else if(tab==='tv'){
+      main=`<div class="soft" style="padding:12px"><p class="muted">Tiến bộ theo nhóm từ (số từ vận dụng tốt tăng dần theo thời gian) — cần tích lũy nhiều buổi để so sánh. Dữ liệu sẽ tự tổng hợp.</p></div>`;
+    } else {
+      main=`<div class="soft" style="padding:12px"><p class="muted">So sánh giữa hai giai đoạn (ví dụ trước/sau giữa kỳ) — cần đủ dữ liệu theo mốc thời gian.</p></div>`;
+    }
+    body.innerHTML=`<div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div>${main}`;
+    body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
+  }
+  render();
 }
 function wordMap(){ const m={}; (typeof ALLWORDS!=='undefined'?ALLWORDS:[]).forEach(w=>m[w.id]=w); return m; }
 function bucketsFromCards(cardMap){
@@ -1104,47 +1304,58 @@ function statusBar(bk){
   bar+='</div>'; return bar;
 }
 async function teacherDash(){
-  const panel=$('#panel'); const stus=await stuCol(STATE.code).get();
-  if(stus.empty){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào vào lớp.<br>Gửi <b>mã lớp ${esc(STATE.codeShort||STATE.code)}</b> cho các em để đăng ký nhé.</div>
-    <p class="center" style="margin-top:10px"><button class="linklike" id="bk">← Lớp khác</button></p>`;
-    const bk=$('#bk'); if(bk) bk.onclick=viewTeacherHome; return; }
-  panel.innerHTML='<p class="muted">Đang tải dữ liệu học viên…</p>';
-  const WM=wordMap(); const rows=[]; const classWeak={};
-  for(const s of stus.docs){ const d=s.data();
-    const cards=(await cardsCol(STATE.code,s.id).get()).docs.map(x=>x.data());
-    const sess=(await sessCol(STATE.code,s.id).get()).docs.map(x=>x.data());
-    const cardMap={}; cards.forEach(c=>cardMap[c.wid]=c);
-    const bk=bucketsFromCards(cardMap);
-    cards.forEach(c=>{ if((c.wrong||0)>(c.correct||0)) classWeak[c.wid]=(classWeak[c.wid]||0)+1; });
-    const totSec=sess.reduce((n,x)=>n+(x.dur||0),0), rev=sess.reduce((n,x)=>n+(x.reviewed||0),0), corr=sess.reduce((n,x)=>n+(x.correct||0),0);
-    rows.push({uid:s.id,name:d.name||'(chưa đặt tên)',email:d.email||'',streak:d.streak||0,learned:cards.length,mastered:bk.g,learning:bk.b,weak:bk.a,wait:bk.wt,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,cards,sess,cardMap});
-  }
-  const avgAcc=rows.length?Math.round(rows.reduce((n,r)=>n+r.acc,0)/rows.length):0;
-  const totalMastered=rows.reduce((n,r)=>n+r.mastered,0);
+  const panel=$('#panel'); panel.innerHTML='<p class="muted">Đang tải dữ liệu học viên…</p>';
+  let data; try{ data=await classData(); }catch(e){ panel.innerHTML='<p class="muted">Lỗi tải dữ liệu học viên.</p>'; return; }
+  const {rows,classWeak,WM}=data;
+  const curr=(typeof ALLWORDS!=='undefined'?ALLWORDS.length:0);
+  if(!rows.length){ panel.innerHTML=`<div class="soft" style="padding:16px">Chưa có học viên nào vào lớp.<br>Gửi <b>mã lớp ${esc(STATE.codeShort||STATE.code)}</b> cho các em để đăng ký nhé.</div>`; return; }
   const hard=Object.keys(classWeak).map(id=>({w:WM[id],n:classWeak[id]})).filter(x=>x.w).sort((a,b)=>b.n-a.n).slice(0,8);
-  let html=`<div class="row" style="margin-bottom:10px"><button class="linklike" id="bk">← Lớp khác</button> &nbsp;·&nbsp; Mã lớp: <b>${esc(STATE.codeShort||STATE.code)}</b></div>
-    <div class="grid cols3"><div class="stat"><b>${rows.length}</b><span>HỌC VIÊN</span></div><div class="stat"><b>${avgAcc}%</b><span>ĐÚNG TB</span></div><div class="stat"><b>${totalMastered}</b><span>LƯỢT TỪ NẮM VỮNG</span></div></div>`;
-  if(hard.length){
-    html+=`<div class="soft" style="padding:12px;margin-top:12px"><b>🔥 Từ khó của cả lớp</b> <small class="muted">(nhiều em đang sai)</small>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">`+
-      hard.map(h=>`<span class="pill" title="${esc(h.w.pinyin)} · ${esc(h.w.vi)}">${esc(h.w.hanzi)} <b>×${h.n}</b></span>`).join('')+
-      `</div><p class="muted" style="margin-top:6px;font-size:.82rem">Gợi ý: nên chữa chung các từ này ở buổi sau.</p></div>`;
+  const prog=r=>curr?Math.round(Math.min(r.learned,curr)/curr*100):0;
+  const statusOf=r=>!(r.sessions)?['n','Chưa học']:r.acc>=75?['g','Đang học']:['y','Cần hỗ trợ'];
+  const initials=nm=>{const p=(nm||'?').trim().split(/\s+/);return (((p[0]||'')[0]||'')+((p[p.length-1]||'')[0]||'')).toUpperCase();};
+  let q='',fSt='all',fLv='all';
+  function pass(r){
+    if(q){const s=(r.name+' '+r.email).toLowerCase();if(!s.includes(q.toLowerCase()))return false;}
+    const st=statusOf(r)[1];
+    if(fSt==='active'&&st!=='Đang học')return false;
+    if(fSt==='help'&&st!=='Cần hỗ trợ')return false;
+    if(fSt==='none'&&st!=='Chưa học')return false;
+    if(fLv==='good'&&!(r.acc>=90))return false;
+    if(fLv==='ok'&&!(r.acc>=75&&r.acc<90))return false;
+    if(fLv==='weak'&&!(r.acc<75))return false;
+    return true;
   }
-  html+=`<div class="row" style="margin:14px 0"><button class="btn sm" id="csv">⬇️ Xuất CSV</button> <span class="muted" style="font-size:.84rem">— bấm tên học viên để xem chi tiết</span></div>
-    <div class="tbl-wrap"><table><thead><tr><th>Tên</th><th>🔥</th><th>Nắm vững</th><th>Đang học</th><th>Cần củng cố</th><th>Buổi</th><th>Đúng</th><th></th></tr></thead><tbody>`;
-  rows.forEach((r,i)=>html+=`<tr><td><button class="linklike open" data-i="${i}" style="font-weight:700">${esc(r.name)}</button></td><td>${r.streak}</td><td>${r.mastered}</td><td>${r.learning}</td><td class="${r.weak?'weak':''}">${r.weak}</td><td>${r.sessions}</td><td>${r.acc}%</td><td style="white-space:nowrap"><button class="btn sm reset" data-email="${esc(r.email)}" title="Gửi mail đặt lại mật khẩu">MK</button> <button class="btn sm kick" data-uid="${esc(r.uid)}" data-name="${esc(r.name)}" data-email="${esc(r.email)}" style="background:#e5484d;color:#fff" title="Xóa &amp; cấm">🚫</button></td></tr>`);
-  html+='</tbody></table></div><div id="banbox" style="margin-top:14px"></div>'; panel.innerHTML=html;
-  const bk=$('#bk'); if(bk) bk.onclick=viewTeacherHome;
+  function draw(){
+    const list=rows.filter(pass); const tb=$('#stub');
+    tb.innerHTML=list.length?list.map(r=>{const idx=rows.indexOf(r);const st=statusOf(r);const pv=prog(r);return `<tr>
+      <td>${idx+1}</td>
+      <td><div style="display:flex;align-items:center;gap:9px"><span class="avatarc">${esc(initials(r.name))}</span><div style="min-width:0"><b>${esc(r.name)}</b>${r.email?`<small class="muted" style="display:block">${esc(r.email)}</small>`:''}</div></div></td>
+      <td style="min-width:120px"><div class="barcell"><div class="pbar"><span style="width:${pv}%"></span></div><span>${pv}%</span></div></td>
+      <td title="Điểm kiểm tra — hiện khi có bài kiểm tra">—</td>
+      <td><b>${r.acc}%</b></td>
+      <td class="muted">${fmtDur(r.time)}</td>
+      <td><span class="chip ${st[0]}">${st[1]}</span></td>
+      <td style="white-space:nowrap"><button class="btn sm open" data-i="${idx}" title="Xem chi tiết">👁</button> <button class="btn sm reset" data-email="${esc(r.email)}" title="Gửi mail đặt lại mật khẩu">MK</button> <button class="btn sm kick" data-uid="${esc(r.uid)}" data-name="${esc(r.name)}" data-email="${esc(r.email)}" style="background:#e5484d;color:#fff" title="Xóa & cấm">🚫</button></td></tr>`;}).join(''):`<tr><td colspan="8" class="muted" style="text-align:center;padding:16px">Không có học viên khớp bộ lọc.</td></tr>`;
+    tb.querySelectorAll('.open').forEach(b=>b.onclick=()=>studentDetail(rows[+b.dataset.i]));
+    tb.querySelectorAll('.reset').forEach(b=>b.onclick=async()=>{const em=b.dataset.email;if(!em)return toast('Học viên này chưa có email');try{await auth.sendPasswordResetEmail(em);toast('Đã gửi mail đặt lại cho '+em);}catch(e){toast(authErr(e));}});
+    tb.querySelectorAll('.kick').forEach(b=>b.onclick=async()=>{const uid=b.dataset.uid,nm=b.dataset.name||'học viên này',em=b.dataset.email||'';if(!confirm('Xóa & cấm '+nm+' khỏi lớp?\nBạn này sẽ không vào lại được (có thể Bỏ cấm sau).'))return;b.disabled=true;try{await removeAndBan(STATE.code,uid,em,nm);toast('Đã xóa & cấm '+nm);await classData(true);teacherDash();}catch(e){b.disabled=false;toast(authErr(e));}});
+  }
+  panel.innerHTML=`
+    <div class="tc-head"><h3>Danh sách học viên <span class="muted" style="font-weight:600;font-size:.9rem">· ${esc(STATE.codeShort||STATE.code)}</span></h3>
+      <div class="tc-filters">
+        <input id="fq" placeholder="🔎 Tìm theo tên, email…" style="min-width:170px">
+        <select id="fst"><option value="all">Tất cả trạng thái</option><option value="active">Đang học</option><option value="help">Cần hỗ trợ</option><option value="none">Chưa học</option></select>
+        <select id="flv"><option value="all">Tất cả mức độ</option><option value="good">Tốt (≥90%)</option><option value="ok">Khá (75–89%)</option><option value="weak">Yếu (&lt;75%)</option></select>
+        <button class="btn sm" id="csv">⬇️ Xuất Excel</button>
+      </div></div>
+    ${hard.length?`<div class="soft" style="padding:12px;margin-bottom:12px"><b>🔥 Từ khó của cả lớp</b> <small class="muted">(nhiều em đang sai)</small><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${hard.map(h=>`<span class="pill" title="${esc(h.w.pinyin)} · ${esc(h.w.vi)}">${esc(h.w.hanzi)} <b>×${h.n}</b></span>`).join('')}</div></div>`:''}
+    <div class="soft" style="padding:10px"><div class="tbl-wrap"><table><thead><tr><th>STT</th><th>Học viên</th><th>Tiến độ</th><th>Điểm TB</th><th>Tỷ lệ đúng</th><th>Thời gian tích luỹ</th><th>Trạng thái</th><th></th></tr></thead><tbody id="stub"></tbody></table></div></div>
+    <div id="banbox" style="margin-top:14px"></div>`;
   $('#csv').onclick=()=>exportCSV(rows);
-  panel.querySelectorAll('.open').forEach(b=>b.onclick=()=>studentDetail(rows[+b.dataset.i]));
-  panel.querySelectorAll('.reset').forEach(b=>b.onclick=async()=>{const em=b.dataset.email;if(!em)return toast('Học viên này chưa có email');try{await auth.sendPasswordResetEmail(em);toast('Đã gửi mail đặt lại cho '+em);}catch(e){toast(authErr(e));}});
-  panel.querySelectorAll('.kick').forEach(b=>b.onclick=async()=>{
-    const uid=b.dataset.uid, nm=b.dataset.name||'học viên này', em=b.dataset.email||'';
-    if(!confirm('Xóa & cấm '+nm+' khỏi lớp?\nBạn này sẽ không vào lại được (có thể Bỏ cấm sau).')) return;
-    b.disabled=true;
-    try{ await removeAndBan(STATE.code, uid, em, nm); toast('Đã xóa & cấm '+nm); teacherDash(); }
-    catch(e){ b.disabled=false; toast(authErr(e)); }
-  });
+  $('#fq').oninput=e=>{q=e.target.value;draw();};
+  $('#fst').onchange=e=>{fSt=e.target.value;draw();};
+  $('#flv').onchange=e=>{fLv=e.target.value;draw();};
+  draw();
   await renderBanned();
 }
 function studentDetail(r){
