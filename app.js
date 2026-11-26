@@ -45,6 +45,8 @@ const stuCol=c=>clsRef(c).collection('students');
 const stuRef=(c,s)=>stuCol(c).doc(s);
 const cardsCol=(c,s)=>stuRef(c,s).collection('cards');
 const sessCol=(c,s)=>stuRef(c,s).collection('sessions');
+const testsCol=c=>clsRef(c).collection('tests');
+const resCol=(c,s)=>stuRef(c,s).collection('results');
 
 /* ---- lịch lặp lại ngắt quãng (SM-2 rút gọn) + mức thành thạo chung ---- */
 function schedule(card,grade){
@@ -86,6 +88,7 @@ const NAV_GROUPS=[
     {id:'lessons', ic:'📚', t:'Danh sách bài học'},
     {id:'home',    ic:'📘', t:'Tổng quan khóa học'},
     {id:'exercise',ic:'📝', t:'Bài tập SBT'},
+    {id:'test',    ic:'🧪', t:'Kiểm tra'},
   ]},
   {label:'CÔNG CỤ HỌC TẬP',items:[
     {id:'review', ic:'🔁', t:'Ôn tập thông minh'},
@@ -124,6 +127,7 @@ function go(r){ ROUTE=r;
   if(r==='home')return pageHome();
   if(r==='lessons')return pageLesson();
   if(r==='exercise'||r==='sbt')return pageSBT();
+  if(r==='test')return pageTest();
   if(r==='review')return pageReview();
   if(r==='list')return pageList();
   if(r==='mywords')return pageMyWords();
@@ -358,6 +362,78 @@ function pageClassroom(){
     <p class="muted" style="max-width:520px;margin:10px auto 0">Phòng học tương tác thời gian thực (giáo viên tổ chức luyện tập, học sinh trả lời trên thiết bị, AI chấm & ghi nhận lỗi) đang được xây dựng theo từng giai đoạn.</p>
     <span class="pill coral" style="margin-top:14px;display:inline-block">🚧 Sắp ra mắt</span>
   </div>`);
+}
+async function pageTest(){
+  shell('<div class="xcard"><p class="muted">Đang tải bài kiểm tra…</p></div>');
+  let tests=[],results={};
+  try{ const q=await testsCol(STATE.code).get(); tests=q.docs.map(d=>({id:d.id,...d.data()})); }catch(e){}
+  tests.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  try{ const r=await resCol(STATE.code,STATE.sid).get(); r.docs.forEach(d=>results[d.id]=d.data()); }catch(e){}
+  let html=`<div class="xcard"><h2 style="margin:0">🧪 Kiểm tra</h2><p class="muted" style="margin-top:4px">Làm bài kiểm tra cô giao. Kết quả tự gửi về cho giáo viên.</p></div>`;
+  if(!tests.length){
+    html+=`<div class="xcard center" style="padding:30px"><div class="big">📝</div><p class="muted" style="margin-top:8px">Chưa có bài kiểm tra nào. Khi cô giao đề, bài sẽ hiện ở đây.</p></div>`;
+  }else{
+    html+='<div class="card">';
+    tests.forEach(t=>{const r=results[t.id];const nq=(t.questions||[]).length;
+      html+=`<div class="listbtn" style="cursor:default"><div class="spread"><div><b>${esc(t.title||'Bài kiểm tra')}</b><small class="muted" style="display:block">${nq} câu${t.lessonTitle?' · '+esc(t.lessonTitle):''}</small></div>`;
+      if(r){ html+=`<span class="pill jade">${r.score==null?'Chờ chấm':('Điểm '+r.score+'/100')}</span>`; }
+      else { html+=`<button class="btn sm do" data-id="${esc(t.id)}">Làm bài →</button>`; }
+      html+='</div></div>';
+    });
+    html+='</div>';
+  }
+  shell(html);
+  root.querySelectorAll('.do').forEach(b=>b.onclick=()=>{const t=tests.find(x=>x.id===b.dataset.id);if(t)takeTest(t);});
+}
+function takeTest(test){
+  const qs=test.questions||[];
+  let html=`<div class="xcard"><div class="spread"><h2 style="margin:0">${esc(test.title||'Bài kiểm tra')}</h2><button class="linklike" id="bk">← Thoát</button></div><p class="muted" style="margin-top:4px">${qs.length} câu · làm xong bấm Nộp bài.</p></div><div class="card" id="qbox">`;
+  qs.forEach((q,i)=>{
+    html+=`<div style="padding:12px 0;border-bottom:1px solid #eef2f7"><div style="font-weight:700;margin-bottom:8px">Câu ${i+1}. ${esc(q.q||'')}</div>`;
+    if(q.type==='mc'||q.type==='tf'){
+      const opts=q.type==='tf'?['Đúng','Sai']:(q.options||[]);
+      html+=opts.map((o,j)=>`<label class="opt" style="display:block;cursor:pointer;margin:4px 0;text-align:left"><input type="radio" name="q${i}" value="${j}" style="margin-right:8px">${esc(o)}</label>`).join('');
+    }else if(q.type==='fill'){
+      html+=`<input class="ansbox fillin" data-i="${i}" placeholder="Nhập đáp án" style="width:100%">`;
+    }else{
+      html+=`<textarea class="fillin" data-i="${i}" rows="3" placeholder="Viết câu trả lời…" style="width:100%;padding:10px;border:1px solid #e2e8f1;border-radius:9px;font:inherit"></textarea><small class="muted">Câu tự luận — giáo viên sẽ chấm.</small>`;
+    }
+    html+='</div>';
+  });
+  html+=`</div><button class="btn block" id="submit" style="margin-top:14px">Nộp bài</button>`;
+  shell(html);
+  $('#bk').onclick=()=>go('test');
+  $('#submit').onclick=()=>{
+    const ans=qs.map((q,i)=>{
+      if(q.type==='mc'||q.type==='tf'){const sel=root.querySelector(`input[name="q${i}"]:checked`);return sel?+sel.value:null;}
+      const el=root.querySelector(`.fillin[data-i="${i}"]`);return el?el.value.trim():'';
+    });
+    submitTest(test,ans);
+  };
+}
+async function submitTest(test,ans){
+  const qs=test.questions||[];
+  const norm=s=>(s==null?'':s).toString().trim().toLowerCase().replace(/\s+/g,' ');
+  let earned=0,autoMax=0,hasEssay=false;
+  const detail=qs.map((q,i)=>{const pts=q.points||1;let ok=null;
+    if(q.type==='mc'||q.type==='tf'){autoMax+=pts;ok=(ans[i]===q.answer);if(ok)earned+=pts;}
+    else if(q.type==='fill'){autoMax+=pts;const acc=(q.accept||[q.answer]).map(norm);ok=acc.includes(norm(ans[i]));if(ok)earned+=pts;}
+    else{hasEssay=true;}
+    return {ok};});
+  const score=autoMax?Math.round(earned/autoMax*100):null;
+  const rec={tid:test.id,title:test.title||'Bài kiểm tra',score,earned,autoMax,answers:ans,hasEssay,graded:!hasEssay,submittedAt:now()};
+  try{ await resCol(STATE.code,STATE.sid).doc(test.id).set(rec); }catch(e){ toast('Lưu kết quả lỗi: '+authErr(e)); }
+  let html=`<div class="xcard center" style="padding:28px"><div class="big">${score==null?'📝':score>=80?'🎉':score>=50?'👍':'💪'}</div><h2 style="margin-top:6px">${score==null?'Đã nộp bài!':'Điểm của bạn: '+score+'/100'}</h2>${hasEssay?'<p class="muted">Có câu tự luận — giáo viên sẽ chấm và cập nhật điểm.</p>':''}</div><div class="card"><h3>Chi tiết</h3>`;
+  qs.forEach((q,i)=>{const d=detail[i];const mark=d.ok==null?'·':d.ok?'✅':'❌';
+    html+=`<div style="padding:8px 0;border-bottom:1px solid #eef2f7"><div style="font-weight:600">${mark} Câu ${i+1}. ${esc(q.q||'')}</div>`;
+    if(q.type==='mc')html+=`<div class="muted" style="font-size:.86rem">Đáp án đúng: ${esc((q.options||[])[q.answer]||'')}</div>`;
+    else if(q.type==='tf')html+=`<div class="muted" style="font-size:.86rem">Đáp án đúng: ${q.answer===0?'Đúng':'Sai'}</div>`;
+    else if(q.type==='fill')html+=`<div class="muted" style="font-size:.86rem">Đáp án: ${esc(q.answer||'')}</div>`;
+    html+='</div>';
+  });
+  html+='</div><button class="btn block" id="done" style="margin-top:14px">Xong</button>';
+  shell(html);
+  $('#done').onclick=()=>go('test');
 }
 function pageHome(){
   const learned=Object.keys(CARDS).length;
@@ -983,7 +1059,10 @@ async function loadClassRows(){
     const bk=bucketsFromCards(cardMap);
     cards.forEach(c=>{ if((c.wrong||0)>(c.correct||0)) classWeak[c.wid]=(classWeak[c.wid]||0)+1; });
     const totSec=sess.reduce((n,x)=>n+(x.dur||0),0), rev=sess.reduce((n,x)=>n+(x.reviewed||0),0), corr=sess.reduce((n,x)=>n+(x.correct||0),0);
-    rows.push({uid:s.id,name:d.name||'(chưa đặt tên)',email:d.email||'',streak:d.streak||0,learned:cards.length,mastered:bk.g,learning:bk.b,weak:bk.a,wait:bk.wt,bk,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,cards,sess,cardMap});
+    let results=[]; try{ results=(await resCol(STATE.code,s.id).get()).docs.map(x=>x.data()); }catch(e){}
+    const scored=results.filter(x=>typeof x.score==='number');
+    const testAvg=scored.length?Math.round(scored.reduce((n,x)=>n+x.score,0)/scored.length):null;
+    rows.push({uid:s.id,name:d.name||'(chưa đặt tên)',email:d.email||'',streak:d.streak||0,learned:cards.length,mastered:bk.g,learning:bk.b,weak:bk.a,wait:bk.wt,bk,sessions:sess.length,time:totSec,acc:rev?Math.round(corr/rev*100):0,testAvg,results,cards,sess,cardMap});
   }
   return {rows,classWeak,WM};
 }
@@ -1231,16 +1310,40 @@ async function tcReport(body){
   </div>`;
   const b=$('#toStu'); if(b)b.onclick=()=>viewTeacher('students');
 }
-function tcTests(body){
+async function tcTests(body){
+  body.innerHTML='<p class="muted">Đang tải…</p>';
+  let tests=[],rows=[];
+  try{ const q=await testsCol(STATE.code).get(); tests=q.docs.map(d=>({id:d.id,...d.data()})); }catch(e){}
+  tests.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  try{ rows=(await classData()).rows; }catch(e){}
+  const resAgg={}; rows.forEach(r=>(r.results||[]).forEach(x=>{const a=resAgg[x.tid]||(resAgg[x.tid]={done:0,sum:0,scored:0});a.done++;if(typeof x.score==='number'){a.sum+=x.score;a.scored++;}}));
   let tab='list';
   function render(){
     const tabs=[['list','Bài kiểm tra'],['crit','Đánh giá theo tiêu chí'],['bank','Ngân hàng câu hỏi']];
-    const inner=tab==='list'?`<div class="tbl-wrap"><table><thead><tr><th>Tên bài kiểm tra</th><th>Bài học</th><th>Hình thức</th><th>Số câu</th><th>Đã làm</th><th>Điểm TB</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody><tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Chưa có bài kiểm tra nào.<br>Bấm <b>+ Tạo bài kiểm tra</b> (trắc nghiệm / tự luận / nói với AI). Tính năng đang phát triển — cấu trúc đã sẵn sàng.</td></tr></tbody></table></div>`:tab==='crit'?`<div style="padding:24px;text-align:center" class="muted">Thiết lập thang điểm theo tiêu chí (từ vựng, ngữ pháp, phát âm, phản hồi…) để chấm đồng bộ — sắp ra mắt.</div>`:`<div style="padding:24px;text-align:center" class="muted">Ngân hàng câu hỏi theo bài học để tái sử dụng khi tạo đề — sắp ra mắt.</div>`;
-    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><button class="btn sm" id="mk">+ Tạo bài kiểm tra</button></div><div class="soft" style="padding:10px">${inner}</div>`;
+    let inner;
+    if(tab==='list'){
+      const trs=tests.map(t=>{const a=resAgg[t.id]||{done:0,sum:0,scored:0};const avg=a.scored?Math.round(a.sum/a.scored):null;return `<tr><td><b>${esc(t.title||'—')}</b></td><td>${esc(t.lessonTitle||'—')}</td><td>Trắc nghiệm</td><td>${(t.questions||[]).length}</td><td>${a.done}/${rows.length||0}</td><td>${avg==null?'—':'<b>'+avg+'</b>'}</td><td><span class="chip ${a.done?'g':'n'}">${a.done?'Đang mở':'Chưa có bài làm'}</span></td><td><button class="btn sm del" data-id="${esc(t.id)}" style="background:#e5484d;color:#fff" title="Xóa">Xóa</button></td></tr>`;}).join('');
+      inner=tests.length?`<div class="tbl-wrap"><table><thead><tr><th>Tên bài kiểm tra</th><th>Bài học</th><th>Hình thức</th><th>Số câu</th><th>Đã làm</th><th>Điểm TB</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${trs}</tbody></table></div>`:`<div style="padding:22px;text-align:center" class="muted">Chưa có bài kiểm tra.<br>Bấm <b>➕ Tạo đề mẫu</b> để thử ngay, hoặc gửi đề cho Claude để nạp đề thật của cô.</div>`;
+    }else if(tab==='crit'){ inner=`<div style="padding:24px;text-align:center" class="muted">Thiết lập thang điểm theo tiêu chí (từ vựng, ngữ pháp, phát âm, phản hồi…) để chấm đồng bộ — sắp ra mắt.</div>`; }
+    else{ inner=`<div style="padding:24px;text-align:center" class="muted">Ngân hàng câu hỏi theo bài học để tái sử dụng khi tạo đề — sắp ra mắt.</div>`; }
+    body.innerHTML=`<div class="tc-head"><div class="tc-tabs">${tabs.map(([k,l])=>`<button class="tc-tab ${tab===k?'on':''}" data-t="${k}">${l}</button>`).join('')}</div><button class="btn sm" id="seed">➕ Tạo đề mẫu</button></div><div class="soft" style="padding:10px">${inner}</div><p class="muted" style="margin-top:8px;font-size:.82rem">Học sinh làm bài ở mục <b>Kiểm tra</b> bên giao diện học viên; điểm tự động đổ về đây và vào cột Điểm TB của trang Học viên. Gửi đề của cô cho Claude để nạp đề thật (trắc nghiệm / điền từ / tự luận).</p>`;
     body.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();});
-    const mk=$('#mk'); if(mk)mk.onclick=()=>toast('Tính năng tạo bài kiểm tra đang được phát triển');
+    const sd=$('#seed'); if(sd)sd.onclick=seedSampleTest;
+    body.querySelectorAll('.del').forEach(b=>b.onclick=async()=>{if(!confirm('Xóa bài kiểm tra này?'))return;try{await testsCol(STATE.code).doc(b.dataset.id).delete();toast('Đã xóa');tcTests(body);}catch(e){toast(authErr(e));}});
   }
   render();
+}
+async function seedSampleTest(){
+  try{
+    const words=(typeof ALLWORDS!=='undefined'?ALLWORDS:[]).slice();
+    if(words.length<4){ toast('Chưa có từ vựng để tạo đề'); return; }
+    const pick=shuffle(words.slice()).slice(0,5);
+    const questions=pick.map(w=>{const others=shuffle(words.filter(x=>x.id!==w.id)).slice(0,3).map(x=>x.vi);const opts=shuffle([w.vi,...others]);return {type:'mc',q:`Nghĩa của 「${w.hanzi}」(${w.pinyin}) là gì?`,options:opts,answer:opts.indexOf(w.vi),points:1};});
+    const lesTitle=(typeof LESSONS!=='undefined'&&LESSONS[0])?LESSONS[0].title:'';
+    await testsCol(STATE.code).add({title:'Đề mẫu – Trắc nghiệm nghĩa từ',lessonTitle:lesTitle,questions,createdAt:now()});
+    toast('Đã tạo đề mẫu 🎉');
+    const body=$('#panel'); if(body)tcTests(body);
+  }catch(e){ toast('Lỗi tạo đề: '+authErr(e)); }
 }
 async function tcProgress(body){
   body.innerHTML='<p class="muted">Đang tải…</p>';
@@ -1331,7 +1434,7 @@ async function teacherDash(){
       <td>${idx+1}</td>
       <td><div style="display:flex;align-items:center;gap:9px"><span class="avatarc">${esc(initials(r.name))}</span><div style="min-width:0"><b>${esc(r.name)}</b>${r.email?`<small class="muted" style="display:block">${esc(r.email)}</small>`:''}</div></div></td>
       <td style="min-width:120px"><div class="barcell"><div class="pbar"><span style="width:${pv}%"></span></div><span>${pv}%</span></div></td>
-      <td title="Điểm kiểm tra — hiện khi có bài kiểm tra">—</td>
+      <td title="Điểm trung bình các bài kiểm tra">${r.testAvg==null?'—':'<b>'+r.testAvg+'</b>'}</td>
       <td><b>${r.acc}%</b></td>
       <td class="muted">${fmtDur(r.time)}</td>
       <td><span class="chip ${st[0]}">${st[1]}</span></td>

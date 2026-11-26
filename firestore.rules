@@ -53,6 +53,12 @@ service cloud.firestore {
         allow read:  if signedIn();
         allow write: if isClassTeacher() || isOwner();
       }
+
+      // Đề kiểm tra (giáo viên tạo, học sinh đọc để làm bài)
+      match /tests/{tid} {
+        allow read:  if signedIn();
+        allow write: if isClassTeacher() || isOwner();
+      }
     }
   }
 }
