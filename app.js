@@ -362,7 +362,7 @@ function pageMyWords(){
 /* ================= LỚP HỌC TRỰC TUYẾN (đang xây dựng) ================= */
 function pageClassroom(){
   liveCleanup(); ensureLiveCss(); STATE._liveUnsub=[];
-  let room=null, joined=false, lastIdx=-1;
+  let room=null, joined=false, lastIdx=-1, started=false;
   function speakCur(){ if(room&&room.status==='open'){ const q=(room.questions||[])[room.curIndex]; if(q)aiSpeak(q.zh); } }
   function paint(){
     if(!room||room.status!=='open'){
@@ -371,7 +371,18 @@ function pageClassroom(){
     }
     if(!joined){
       shell(`<div class="xcard" style="padding:0;overflow:hidden"><div class="live-join"><h2 style="margin:0">Lớp Live – ${esc(STATE.codeShort||STATE.code)}</h2><span class="chip g" style="margin-top:6px;display:inline-block">● Đang diễn ra</span><p style="margin-top:12px;font-size:1.15rem"><b>${esc(room.lessonTitle||'')}</b></p><p class="muted">${(room.questions||[]).length} câu luyện tập · GV ${esc(room.teacherName||'')}</p><button class="btn block" id="join" style="margin-top:14px">▶ Tham gia ngay</button></div></div>`);
-      const j=$('#join'); if(j)j.onclick=async()=>{ try{ await partsCol(STATE.code).doc(STATE.sid).set({name:(ME&&ME.name)||'',state:'listening',answered:0,joinedAt:now()}); joined=true; lastIdx=room.curIndex; paint(); setTimeout(speakCur,300); }catch(e){ toast(authErr(e)); } };
+      const j=$('#join'); if(j)j.onclick=async()=>{ try{ await partsCol(STATE.code).doc(STATE.sid).set({name:(ME&&ME.name)||'',state:'listening',answered:0,joinedAt:now()}); joined=true; started=false; paint(); }catch(e){ toast(authErr(e)); } };
+      return;
+    }
+    if(!started){
+      shell(`<div class="xcard" style="padding:0;overflow:hidden">
+        <div class="live-head"><span><b>🔴 LIVE</b> · ${esc(STATE.codeShort||STATE.code)}</span><span class="muted">${esc(room.lessonTitle||'')}</span></div>
+        <div class="live-progress">${LIVE_PHASES.map((p,i)=>`<span class="${i<=room.phaseIndex?'on':''}">${esc(p[0])}</span>`).join('')}</div>
+        <div style="margin:12px">${liveStage(room.greeting||'准备好了吗？',{sign:'XiaoYu Class'})}</div>
+        <div style="padding:0 12px 16px;text-align:center"><p class="muted" style="margin:4px 0 8px">Nghe cô giáo chào rồi bấm để bắt đầu nhé:</p><button class="btn block coral" id="ready">准备好了 ✅ Mình sẵn sàng</button></div>
+      </div>`);
+      setTimeout(()=>aiSpeak(room.greeting||'准备好了吗？'),300);
+      const rb=$('#ready'); if(rb)rb.onclick=()=>{ started=true; lastIdx=room.curIndex; paint(); setTimeout(speakCur,350); };
       return;
     }
     const total=(room.questions||[]).length, q=(room.questions||[])[room.curIndex]||{};
@@ -409,14 +420,17 @@ function pageClassroom(){
     mr.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); liveSetState(''); if(STATE._recTimer){clearTimeout(STATE._recTimer);STATE._recTimer=null;}
       if(btn){btn.textContent='🎤 Nhấn để trả lời (nói)';btn.disabled=false;}
       const fb=$('#feedback'); if(fb)fb.innerHTML='<p class="muted" style="font-size:.85rem">⏳ Đang nhận dạng giọng nói…</p>';
-      try{ const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'}); const fd=new FormData(); fd.append('file',blob,'a.webm');
+      try{ let blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'}); let fname='a.wav';
+        try{ blob=await blobToWav(blob); }catch(e){ fname='a.webm'; }
+        const fd=new FormData(); fd.append('file',blob,fname);
         const r=await fetch(AI_BASE.replace(/\/$/,'')+'/stt',{method:'POST',body:fd}); const d=await r.json(); const txt=(d.text||'').trim();
-        if(!txt){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Chưa nghe rõ, thử nói lại nhé.</div>'; return; }
+        if(!txt){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Chưa nghe rõ, nói to & rõ hơn rồi thử lại nhé.</div>'; return; }
         evaluate(q,txt);
       }catch(e){ if(fb)fb.innerHTML='<div class="soft" style="padding:10px;font-size:.85rem">Lỗi nhận dạng, thử lại.</div>'; }
     };
     mr.start(); liveSetState('recording'); partsCol(STATE.code).doc(STATE.sid).update({state:'speaking'}).catch(()=>{});
     if(btn){btn.textContent='⏹ Đang ghi… nhấn để dừng & gửi';}
+    const fb0=$('#feedback'); if(fb0)fb0.innerHTML='<p class="muted" style="font-size:.85rem">🔴 Đang ghi âm… nói xong bấm nút lần nữa để gửi.</p>';
     STATE._recTimer=setTimeout(()=>{ try{ if(mr.state==='recording')mr.stop(); }catch(e){} },60000);
   }
   function showKeyword(){
@@ -1519,6 +1533,23 @@ function liveStage(qzh,opts){ opts=opts||{};
 }
 function liveSetState(s){ const el=document.getElementById('stage'); if(!el)return; el.classList.remove('speaking','recording','praise'); if(s)el.classList.add(s); }
 function liveBadge(txt){ const b=document.getElementById('livebadge'); if(!b)return; b.textContent=txt||''; b.classList.toggle('show',!!txt); }
+async function blobToWav(blob){
+  const ab=await blob.arrayBuffer();
+  const AC=window.AudioContext||window.webkitAudioContext;
+  const ctx=new AC();
+  const buf=await ctx.decodeAudioData(ab);
+  try{ ctx.close(); }catch(e){}
+  const ch=buf.numberOfChannels,len=buf.length,mono=new Float32Array(len);
+  for(let c=0;c<ch;c++){ const d=buf.getChannelData(c); for(let i=0;i<len;i++) mono[i]+=d[i]/ch; }
+  const target=16000,ratio=buf.sampleRate/target,outLen=buf.sampleRate>target?Math.floor(len/ratio):len;
+  const data=new Float32Array(outLen);
+  for(let i=0;i<outLen;i++) data[i]=mono[buf.sampleRate>target?Math.floor(i*ratio):i];
+  const n=outLen,out=new ArrayBuffer(44+n*2),v=new DataView(out);
+  const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  W(0,'RIFF');v.setUint32(4,36+n*2,true);W(8,'WAVE');W(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,target,true);v.setUint32(28,target*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);W(36,'data');v.setUint32(40,n*2,true);
+  let off=44; for(let i=0;i<n;i++){ let s=Math.max(-1,Math.min(1,data[i])); v.setInt16(off,s<0?s*0x8000:s*0x7fff,true); off+=2; }
+  return new Blob([out],{type:'audio/wav'});
+}
 function aiSpeak(text,rate){
   if(!text)return;
   if(!AI_BASE){ speakZh(text,rate); return; }
@@ -1533,7 +1564,7 @@ function liveSetup(){
   ensureLiveCss();
   const lessons=(typeof LESSONS!=='undefined'?LESSONS:[]);
   let lid=(lessons[0]&&lessons[0].id)||'';
-  const autoQ=les=>{ const tgt=((les&&les.words)||[]).slice(0,4); const qs=['大家好！我们今天来练习。']; tgt.forEach(w=>qs.push(`请用「${w.hanzi}」说一句话。`)); qs.push('你周末打算做什么？'); return qs; };
+  const autoQ=les=>{ const tgt=((les&&les.words)||[]).slice(0,4); const qs=[]; tgt.forEach(w=>qs.push(`请用「${w.hanzi}」说一句话。`)); qs.push('你周末打算做什么？'); return qs; };
   function draw(){
     const les=lessons.find(l=>l.id===lid)||lessons[0]||{words:[]};
     const tgt=(les.words||[]).slice(0,6);
@@ -1558,7 +1589,7 @@ function liveSetup(){
       try{
         try{ const ps=await partsCol(STATE.code).get(); if(!ps.empty){const b=db.batch();ps.docs.forEach(d=>b.delete(d.ref));await b.commit();} }catch(e){}
         try{ const ts=await turnsCol(STATE.code).get(); if(!ts.empty){const b=db.batch();ts.docs.forEach(d=>b.delete(d.ref));await b.commit();} }catch(e){}
-        await liveRef(STATE.code).set({status:'open',lessonTitle:les2.title||'',questions,targetWords:tgt2,phaseIndex:1,curIndex:0,startedAt:now(),endedAt:null,teacherName:(STATE.me&&STATE.me.name)||''});
+        await liveRef(STATE.code).set({status:'open',lessonTitle:les2.title||'',greeting:'大家好！准备好了吗？我们开始练习吧。',questions,targetWords:tgt2,phaseIndex:1,curIndex:0,startedAt:now(),endedAt:null,teacherName:(STATE.me&&STATE.me.name)||''});
         toast('Đã mở phòng Live 🎉'); liveTeacherConsole();
       }catch(e){ btn.disabled=false; btn.textContent='▶ Mở phòng Live'; toast(authErr(e)); }
     };
